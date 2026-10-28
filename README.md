@@ -1,3 +1,8 @@
+不能理解 V3.3了
+使用起来像一坨大便
+就一blog搞的这么复杂
+准备让AI改起来
+
 # MarkGo
 
 [![CI](https://github.com/1mb-dev/markgo/actions/workflows/ci.yml/badge.svg)](https://github.com/1mb-dev/markgo/actions/workflows/ci.yml)
