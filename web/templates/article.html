@@ -21,6 +21,7 @@
                     {{ end }}
                 </div>
             </div>
+            {{ template "image-gallery" .article }}
 
             {{ else if eq .article.Type "link" }}
             <!-- Link detail -->
@@ -106,6 +107,7 @@
                     {{ .article.Content | safeHTML }}
                 {{ end }}
             </div>
+            {{ template "image-gallery" .article }}
             {{ end }}
 
             <!-- Tags (all types) -->

@@ -577,6 +577,10 @@ func setupRoutes(router *gin.Engine, h *handlers.Router, sessionStore *middlewar
 		composeGroup.POST("/upload/:slug",
 			middleware.RateLimit(cfg.RateLimit.Upload.Requests, cfg.RateLimit.Upload.Window),
 			h.Compose.Upload)
+		composeGroup.POST("/image/:slug",
+			middleware.RateLimit(cfg.RateLimit.Upload.Requests, cfg.RateLimit.Upload.Window),
+			h.Compose.UploadImage)
+		composeGroup.DELETE("/image/:slug/:filename", h.Compose.DeleteImage)
 		composeGroup.POST("/quick", h.Compose.HandleQuickPublish)
 		composeGroup.POST("/publish/:slug", h.Compose.PublishDraft)
 	}

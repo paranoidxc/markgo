@@ -1,0 +1,263 @@
+/**
+ * Image gallery — compose image area, nine-grid display, lightbox.
+ *
+ * Grid: 3 columns of square thumbnails (aspect-ratio: 1). Server caps the
+ * card grid at 9 tiles; the 9th overlays a "+N" count when more exist.
+ * Compose area reuses the same tile look plus drag-drop affordances.
+ */
+
+/* ── Nine-grid (feed cards + article pages) ───────────────────────────── */
+
+.image-gallery {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin: 0.75rem 0;
+    max-width: 420px;
+}
+
+.image-gallery-item {
+    position: relative;
+    padding: 0;
+    border: none;
+    background: var(--color-bg-tertiary);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    cursor: zoom-in;
+    aspect-ratio: 1 / 1;
+    display: block;
+    width: 100%;
+}
+
+.image-gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.image-gallery-item:hover img,
+.image-gallery-item:focus-visible img {
+    transform: scale(1.04);
+}
+
+.image-gallery-item:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.image-gallery-more {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-inverse);
+    background: rgba(0, 0, 0, 0.55);
+}
+
+/* ── Lightbox ──────────────────────────────────────────────────────────── */
+
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.88);
+    animation: lightbox-fade 0.15s ease;
+}
+
+@keyframes lightbox-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.lightbox-figure {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    min-height: 0;
+    padding: 24px 56px;
+}
+
+.lightbox-figure img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.lightbox-counter {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: var(--tap-target);
+    height: var(--tap-target);
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.lightbox-close:hover,
+.lightbox-nav:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--tap-target);
+    height: var(--tap-target);
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 22px;
+    cursor: pointer;
+}
+
+.lightbox-nav-prev { left: 10px; }
+.lightbox-nav-next { right: 10px; }
+
+.lightbox-nav[hidden],
+.lightbox-close[hidden] {
+    display: none;
+}
+
+/* ── Compose image area ────────────────────────────────────────────────── */
+
+.compose-gallery-field .compose-gallery-hint {
+    color: var(--color-text-muted);
+}
+
+.compose-gallery {
+    border: 1px dashed var(--color-border-dark);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.compose-gallery.compose-gallery-dragover {
+    border-color: var(--color-primary);
+    background: var(--color-bg-tertiary);
+}
+
+.compose-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+.compose-gallery-grid:not(:empty) {
+    margin-bottom: 10px;
+}
+
+.compose-gallery-tile {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-bg-tertiary);
+}
+
+.compose-gallery-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: zoom-in;
+}
+
+.compose-gallery-tile-uploading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.compose-gallery-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.compose-gallery-remove:hover {
+    background: var(--color-error);
+}
+
+.compose-gallery-remove[disabled] {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.compose-gallery-add {
+    width: 96px;
+    height: 96px;
+    border: 1px dashed var(--color-border-dark);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.compose-gallery-add:hover:not([disabled]) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.compose-gallery-add[disabled] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.compose-gallery-status {
+    display: block;
+    margin-top: 6px;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    min-height: 1.2em;
+}
+
+.compose-gallery-status.upload-error {
+    color: var(--color-error);
+}
+
+.compose-gallery-status.upload-success {
+    color: var(--color-success);
+}

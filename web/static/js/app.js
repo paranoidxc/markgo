@@ -13,6 +13,7 @@ import { init as initTheme } from './modules/theme.js';
 import { init as initHighlight } from './modules/highlight.js';
 import { init as initScroll } from './modules/scroll.js';
 import { init as initLazy } from './modules/lazy.js';
+import { initImageGalleries } from './modules/lightbox.js';
 import { init as initLogin } from './modules/login.js';
 import { init as initToast, showToast } from './modules/toast.js';
 import { init as initFab } from './modules/fab.js';
@@ -96,6 +97,7 @@ async function loadPageModule(template) {
 function reinitPage(template) {
     initHighlight();
     initLazy();
+    initImageGalleries();
     loadPageModule(template);
 }
 
@@ -215,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Content modules — initial page
     initHighlight();
     initLazy();
+    initImageGalleries();
 
     // Page-specific module — initial page
     loadPageModule(document.body.dataset.template);

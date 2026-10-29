@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/1mb-dev/markgo/internal/imaging"
 )
 
 // Article represents a blog article
@@ -28,9 +30,14 @@ type Article struct {
 	// lives in the body (Content). New AMAs carry this in frontmatter; legacy
 	// AMAs (question + "---" + answer in the body) have it derived at load time
 	// by the normalizer in ProcessArticleContent. Plain text, not markdown.
-	Question     string    `yaml:"question,omitempty" json:"question,omitempty"`
-	Banner       string    `yaml:"banner,omitempty" json:"banner,omitempty"`
-	BannerAlt    string    `yaml:"banner_alt,omitempty" json:"banner_alt,omitempty"`
+	Question  string `yaml:"question,omitempty" json:"question,omitempty"`
+	Banner    string `yaml:"banner,omitempty" json:"banner,omitempty"`
+	BannerAlt string `yaml:"banner_alt,omitempty" json:"banner_alt,omitempty"`
+	// Images holds gallery image URLs (usually the /uploads/<slug>/<file>
+	// shape) uploaded via the compose page's image area. Rendered as a
+	// square-thumbnail grid on cards and the article page. Companion
+	// thumbnails follow the imaging.ThumbName convention.
+	Images       []string  `yaml:"images,omitempty" json:"images,omitempty"`
 	Content      string    `yaml:"-" json:"content"`
 	ReadingTime  int       `yaml:"-" json:"reading_time"`
 	WordCount    int       `yaml:"-" json:"word_count"`
@@ -77,6 +84,52 @@ func (a *Article) BannerAltText() string {
 		return a.BannerAlt
 	}
 	return a.Title
+}
+
+// ArticleImage pairs a gallery image's full-size URL with its square
+// thumbnail URL for template rendering.
+type ArticleImage struct {
+	Full  string `json:"full"`
+	Thumb string `json:"thumb"`
+}
+
+// ImagePairs resolves the frontmatter Images list into servable URL pairs.
+// Resolution mirrors BannerSrc: absolute http(s) URLs pass through (thumb
+// falls back to the full URL — no naming convention exists for external
+// hosts), server-absolute paths pass through, and bare filenames resolve
+// under /uploads/<slug>/. Thumbnails are derived with imaging.ThumbName.
+func (a *Article) ImagePairs() []ArticleImage {
+	if len(a.Images) == 0 {
+		return nil
+	}
+	pairs := make([]ArticleImage, 0, len(a.Images))
+	for _, img := range a.Images {
+		if img == "" {
+			continue
+		}
+		var full string
+		switch {
+		case strings.HasPrefix(img, "http://") || strings.HasPrefix(img, "https://"):
+			pairs = append(pairs, ArticleImage{Full: img, Thumb: img})
+			continue
+		case strings.HasPrefix(img, "/"):
+			full = img
+		default:
+			full = "/uploads/" + a.Slug + "/" + img
+		}
+		pairs = append(pairs, ArticleImage{Full: full, Thumb: ThumbURLOf(full)})
+	}
+	return pairs
+}
+
+// ThumbURLOf derives the thumbnail URL for an uploads URL by applying the
+// imaging.ThumbName convention to the final path segment.
+func ThumbURLOf(url string) string {
+	i := strings.LastIndex(url, "/")
+	if i < 0 {
+		return url
+	}
+	return url[:i+1] + imaging.ThumbName(url[i+1:])
 }
 
 // DisplayTitle returns the article title, or synthesizes one from content

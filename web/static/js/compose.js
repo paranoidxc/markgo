@@ -16,6 +16,7 @@ import { showToast } from './modules/toast.js';
 import { authenticatedFetch } from './modules/auth-fetch.js';
 import { key } from './modules/blog-storage.js';
 import { loadHighlighter } from './modules/highlighter-loader.js';
+import { createComposeImages } from './modules/compose-images.js';
 
 const FULL_DRAFT_KEY = key('compose-full-draft');
 const SAVE_DELAY = 2000;
@@ -59,6 +60,8 @@ export function init() {
     const bannerFileInput = document.querySelector('[data-banner-file-input]');
 
     const maxFileSize = parseInt(form?.dataset.maxUpload || '10485760', 10);
+
+    const gallery = createComposeImages({ signal, form, getSlug });
 
     // --- Shared mutable state ---
     let previewVisible = false;
@@ -193,6 +196,7 @@ export function init() {
         // init, not just at click time.
         const bannerBtn = document.querySelector('[data-banner-upload-btn]');
         if (bannerBtn) bannerBtn.disabled = !slug;
+        gallery.refresh();
         if (!slug) {
             setUploadStatus('Save as draft first to upload files', false);
         }

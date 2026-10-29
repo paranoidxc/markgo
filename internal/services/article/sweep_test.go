@@ -55,6 +55,35 @@ func TestOrphanSweep_DoesNotDeleteInlineReferencedFiles(t *testing.T) {
 	assert.NoError(t, err, "inline.png must survive sweep")
 }
 
+func TestOrphanSweep_GalleryImagesAndThumbsProtected(t *testing.T) {
+	uploadDir := t.TempDir()
+	slug := "gallery-post"
+	fullPath := stageOrphanFile(t, uploadDir, slug, "1-image-ab12cd34.jpg")
+	thumbPath := stageOrphanFile(t, uploadDir, slug, "1-image-ab12cd34-thumb.jpg")
+	orphanPath := stageOrphanFile(t, uploadDir, slug, "removed-image.jpg")
+
+	article := &models.Article{
+		Slug:   slug,
+		Images: []string{"/uploads/" + slug + "/1-image-ab12cd34.jpg"},
+	}
+
+	cleaned, errs := OrphanSweep(
+		context.Background(),
+		[]*models.Article{article},
+		uploadDir,
+		quietSweepLogger(),
+	)
+
+	assert.Empty(t, errs)
+	assert.Equal(t, 1, cleaned, "only the unreferenced orphan should be removed")
+	_, err := os.Stat(fullPath)
+	assert.NoError(t, err, "gallery full image must survive sweep")
+	_, err = os.Stat(thumbPath)
+	assert.NoError(t, err, "gallery thumb must survive sweep")
+	_, err = os.Stat(orphanPath)
+	assert.True(t, os.IsNotExist(err), "unreferenced file should be swept")
+}
+
 func TestOrphanSweep_DeletesUnreferencedOrphan(t *testing.T) {
 	uploadDir := t.TempDir()
 	orphanPath := stageOrphanFile(t, uploadDir, "stale-slug", "orphan.png")

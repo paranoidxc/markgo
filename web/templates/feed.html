@@ -57,6 +57,28 @@
 </div>
 {{ end }}
 
+{{ define "image-gallery" }}
+{{/* Nine-grid of square thumbnails. Server caps visible tiles at 9; the 9th
+     overlays "+N" when more exist. Full-size URLs (comma-joined, no comma
+     occurs in upload URLs) feed the lightbox, including hidden entries. */}}
+{{ $pairs := .ImagePairs }}
+{{ if $pairs }}
+{{ $urls := "" }}{{ range $i, $p := $pairs }}{{ if $i }}{{ $urls = print $urls "," }}{{ end }}{{ $urls = print $urls $p.Full }}{{ end }}
+<div class="image-gallery" data-gallery data-full-urls="{{ $urls }}">
+    {{ range $i, $p := $pairs }}
+    {{ if lt $i 9 }}
+    <button type="button" class="image-gallery-item" data-gallery-index="{{ $i }}" aria-label="View image">
+        <img src="{{ $p.Thumb }}" alt="" loading="lazy" width="480" height="480">
+        {{ if and (eq $i 8) (gt (len $pairs) 9) }}
+        <span class="image-gallery-more" aria-hidden="true">+{{ sub (len $pairs) 9 }}</span>
+        {{ end }}
+    </button>
+    {{ end }}
+    {{ end }}
+</div>
+{{ end }}
+{{ end }}
+
 {{ define "card-thought" }}
 <article class="feed-card feed-card-thought">
     <div class="feed-card-accent"></div>
@@ -68,6 +90,7 @@
                 {{ .Content | safeHTML }}
             {{ end }}
         </div>
+        {{ template "image-gallery" . }}
         {{ template "card-meta" . }}
     </div>
 </article>
@@ -104,6 +127,7 @@
         {{ else if .Excerpt }}
         <p class="feed-card-excerpt">{{ .Excerpt }}</p>
         {{ end }}
+        {{ template "image-gallery" . }}
         {{ template "card-meta" . }}
     </div>
 </article>

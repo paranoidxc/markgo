@@ -48,6 +48,7 @@ func buildReferencedSet(articles []*models.Article, absBase string) map[string]s
 	refs := make(map[string]struct{})
 	for _, a := range articles {
 		addBannerRef(refs, a, absBase)
+		addImageRefs(refs, a, absBase)
 		addBodyRefs(refs, a.Content, absBase)
 	}
 	return refs
@@ -82,6 +83,42 @@ func bannerRelativePath(banner, slug string) string {
 		return "" // /static/... and other server-absolute non-uploads
 	default:
 		return slug + "/" + banner
+	}
+}
+
+// addImageRefs records each frontmatter gallery image (and its square
+// thumbnail companion, per the imaging.ThumbName convention) as referenced.
+// Resolution mirrors models.Article.ImagePairs: /uploads/... shapes and bare
+// filenames are slug-owned; external URLs and server-absolute non-uploads
+// paths are ignored (conservatively untracked).
+func addImageRefs(refs map[string]struct{}, a *models.Article, absBase string) {
+	for _, img := range a.Images {
+		if img == "" || strings.HasPrefix(img, "http://") || strings.HasPrefix(img, "https://") {
+			continue
+		}
+		rel := bannerRelativePath(img, a.Slug)
+		if rel == "" {
+			continue
+		}
+		addRefFromRel(refs, rel, absBase)
+		if thumb := thumbRelativePath(rel); thumb != "" {
+			addRefFromRel(refs, thumb, absBase)
+		}
+	}
+}
+
+// thumbRelativePath maps an upload-root-relative image path to its
+// companion thumbnail path, or "" when the extension has no thumbnail form.
+func thumbRelativePath(rel string) string {
+	ext := strings.ToLower(filepath.Ext(rel))
+	base := strings.TrimSuffix(rel, ext)
+	switch ext {
+	case ".png":
+		return base + "-thumb.png"
+	case ".jpg", ".jpeg", ".webp", ".gif":
+		return base + "-thumb.jpg"
+	default:
+		return ""
 	}
 }
 

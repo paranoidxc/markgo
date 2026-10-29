@@ -44,9 +44,13 @@ type Input struct {
 	Categories  string `json:"categories"`
 	Banner      string `json:"banner"`
 	BannerAlt   string `json:"banner_alt"`
-	Draft       bool   `json:"draft"`
-	Asker       string `json:"asker"`
-	AskerEmail  string `json:"asker_email"`
+	// Images is the gallery list uploaded via the compose image area.
+	// Entries are validated /uploads/<slug>/<filename> URLs (see
+	// ParseImagesInput) and stored in frontmatter as `images`.
+	Images     []string `json:"images"`
+	Draft      bool     `json:"draft"`
+	Asker      string   `json:"asker"`
+	AskerEmail string   `json:"asker_email"`
 	// Question is an AMA's reader-submitted question, stored in frontmatter
 	// so the answer (Content/body) never shares the card's data path.
 	Question string `json:"question"`
@@ -131,6 +135,9 @@ func (s *Service) CreatePost(input *Input) (string, error) {
 	setIfNonEmpty(fm, "banner", input.Banner)
 	if input.Banner != "" {
 		setIfNonEmpty(fm, "banner_alt", input.BannerAlt)
+	}
+	if len(input.Images) > 0 {
+		fm["images"] = input.Images
 	}
 	setIfNonEmpty(fm, "author", s.defaultAuthor)
 	setIfNonEmpty(fm, "type", input.Type)
@@ -223,6 +230,13 @@ func (s *Service) LoadArticle(slug string) (*Input, error) {
 	if bannerAlt, ok := fm["banner_alt"].(string); ok {
 		input.BannerAlt = bannerAlt
 	}
+	if imgs, ok := fm["images"].([]any); ok {
+		for _, img := range imgs {
+			if str, ok := img.(string); ok && str != "" {
+				input.Images = append(input.Images, str)
+			}
+		}
+	}
 	if draft, ok := fm["draft"].(bool); ok {
 		input.Draft = draft
 	}
@@ -307,6 +321,14 @@ func (s *Service) UpdateArticle(slug string, input *Input) (prevBanner string, e
 		// so removing a banner doesn't leave orphaned alt text in frontmatter.
 		delete(fm, "banner")
 		delete(fm, "banner_alt")
+	}
+
+	// Images (gallery): set-or-delete like other editable fields. Callers
+	// clean up removed files via UnlinkRemovedImages.
+	if len(input.Images) > 0 {
+		fm["images"] = input.Images
+	} else {
+		delete(fm, "images")
 	}
 
 	fm["draft"] = input.Draft

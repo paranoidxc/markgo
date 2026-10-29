@@ -186,6 +186,17 @@
                     aria-label="Banner alt text"
                 >
             </div>
+            {{ $images := "" }}{{ if .input }}{{ range .input.Images }}{{ $images = print $images . "\n" }}{{ end }}{{ end }}
+            <div class="compose-field compose-gallery-field" data-gallery-field>
+                <label class="compose-label">Images <span class="compose-hint">(optional — drag &amp; drop or add; shown as a square grid on the post)</span></label>
+                <div class="compose-gallery" data-gallery-drop>
+                    <div class="compose-gallery-grid" data-gallery-grid></div>
+                    <button type="button" class="compose-gallery-add" data-gallery-add>Add images</button>
+                    <input type="file" class="compose-gallery-file-input" data-gallery-file-input accept="image/*" multiple hidden>
+                </div>
+                <span class="compose-gallery-status" data-gallery-status aria-live="polite"></span>
+                <input type="hidden" name="images" data-images-input value="{{ $images }}">
+            </div>
             {{ end }}
 
             <div class="compose-actions">
