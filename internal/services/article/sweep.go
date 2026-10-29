@@ -49,6 +49,7 @@ func buildReferencedSet(articles []*models.Article, absBase string) map[string]s
 	for _, a := range articles {
 		addBannerRef(refs, a, absBase)
 		addImageRefs(refs, a, absBase)
+		addMusicRef(refs, a, absBase)
 		addBodyRefs(refs, a.Content, absBase)
 	}
 	return refs
@@ -120,6 +121,20 @@ func thumbRelativePath(rel string) string {
 	default:
 		return ""
 	}
+}
+
+// addMusicRef records the article's frontmatter music track as referenced.
+// Resolution mirrors models.Article.MusicSrc: /uploads/... shapes and bare
+// filenames are slug-owned; external URLs are ignored.
+func addMusicRef(refs map[string]struct{}, a *models.Article, absBase string) {
+	if a.Music == "" || strings.HasPrefix(a.Music, "http://") || strings.HasPrefix(a.Music, "https://") {
+		return
+	}
+	rel := bannerRelativePath(a.Music, a.Slug)
+	if rel == "" {
+		return
+	}
+	addRefFromRel(refs, rel, absBase)
 }
 
 // addBodyRefs scans content for /uploads/<slug>/<filename> patterns and

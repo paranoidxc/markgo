@@ -187,6 +187,7 @@
                 >
             </div>
             {{ $images := "" }}{{ if .input }}{{ range .input.Images }}{{ $images = print $images . "\n" }}{{ end }}{{ end }}
+            {{ $music := "" }}{{ if .input }}{{ $music = .input.Music }}{{ end }}
             <div class="compose-field compose-gallery-field" data-gallery-field>
                 <label class="compose-label">Images <span class="compose-hint">(optional — drag &amp; drop or add; shown as a square grid on the post)</span></label>
                 <div class="compose-gallery" data-gallery-drop>
@@ -196,6 +197,21 @@
                 </div>
                 <span class="compose-gallery-status" data-gallery-status aria-live="polite"></span>
                 <input type="hidden" name="images" data-images-input value="{{ $images }}">
+            </div>
+
+            <div class="compose-field compose-music-field" data-music-field>
+                <label class="compose-label">Music <span class="compose-hint">(optional — one track; adding a new one replaces it)</span></label>
+                <div class="compose-music" data-music-zone>
+                    <div class="compose-music-track" data-music-track hidden>
+                        <span class="compose-music-name" data-music-name></span>
+                        <button type="button" class="compose-music-play" data-music-preview aria-label="Preview track">&#9654;</button>
+                        <button type="button" class="compose-music-remove" data-music-remove aria-label="Remove track">&times;</button>
+                    </div>
+                    <button type="button" class="compose-gallery-add" data-music-add>Add music</button>
+                    <input type="file" class="compose-gallery-file-input" data-music-file-input accept="audio/*" hidden>
+                </div>
+                <span class="compose-gallery-status" data-music-status aria-live="polite"></span>
+                <input type="hidden" name="music" data-music-input value="{{ $music }}">
             </div>
             {{ end }}
 

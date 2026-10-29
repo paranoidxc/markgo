@@ -222,6 +222,7 @@ func (h *ComposeHandler) HandleEdit(c *gin.Context) {
 		Type:        c.PostForm("type"),
 	}
 	input.Images = compose.ParseImagesInput(c.PostForm("images"), slug)
+	input.Music = compose.ParseMusicInput(c.PostForm("music"), slug)
 
 	if input.Content == "" {
 		data := h.buildBaseTemplateData("Edit - " + h.config.Blog.Title)
@@ -243,6 +244,7 @@ func (h *ComposeHandler) HandleEdit(c *gin.Context) {
 	}
 
 	prevImages := h.composeService.PrevImages(slug)
+	prevMusic := h.composeService.PrevMusic(slug)
 	prevBanner, err := h.composeService.UpdateArticle(slug, &input)
 	if err != nil {
 		h.logger.Error("Failed to update post", "error", err, "slug", slug)
@@ -265,6 +267,7 @@ func (h *ComposeHandler) HandleEdit(c *gin.Context) {
 	}
 	compose.UnlinkOwnedUpload(prevBanner, input.Banner, slug, h.config.Upload.Path, h.logger)
 	compose.UnlinkRemovedImages(prevImages, input.Images, slug, h.config.Upload.Path, h.logger)
+	compose.UnlinkRemovedMusic(prevMusic, input.Music, slug, h.config.Upload.Path, h.logger)
 
 	reloadOK := true
 	if err := h.articleService.ReloadArticles(); err != nil {
@@ -311,6 +314,7 @@ func (h *ComposeHandler) HandleSubmit(c *gin.Context) {
 		Slug:        c.PostForm("slug"),
 	}
 	input.Images = compose.ParseImagesInput(c.PostForm("images"), c.PostForm("slug"))
+	input.Music = compose.ParseMusicInput(c.PostForm("music"), c.PostForm("slug"))
 
 	if input.Content == "" {
 		data := h.buildBaseTemplateData("Compose - " + h.config.Blog.Title)

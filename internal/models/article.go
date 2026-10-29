@@ -38,6 +38,10 @@ type Article struct {
 	// square-thumbnail grid on cards and the article page. Companion
 	// thumbnails follow the imaging.ThumbName convention.
 	Images       []string  `yaml:"images,omitempty" json:"images,omitempty"`
+	// Music holds the article's single audio track (usually a
+	// /uploads/<slug>/<file> URL) uploaded via the compose page's music
+	// area. One track per article; a new upload replaces the old one.
+	Music        string    `yaml:"music,omitempty" json:"music,omitempty"`
 	Content      string    `yaml:"-" json:"content"`
 	ReadingTime  int       `yaml:"-" json:"reading_time"`
 	WordCount    int       `yaml:"-" json:"word_count"`
@@ -130,6 +134,22 @@ func ThumbURLOf(url string) string {
 		return url
 	}
 	return url[:i+1] + imaging.ThumbName(url[i+1:])
+}
+
+// MusicSrc resolves the music field into a servable URL, mirroring
+// BannerSrc: absolute http(s) URLs and server-absolute paths pass through;
+// bare filenames resolve under /uploads/<slug>/.
+func (a *Article) MusicSrc() string {
+	if a.Music == "" {
+		return ""
+	}
+	if strings.HasPrefix(a.Music, "http://") || strings.HasPrefix(a.Music, "https://") {
+		return a.Music
+	}
+	if strings.HasPrefix(a.Music, "/") {
+		return a.Music
+	}
+	return "/uploads/" + a.Slug + "/" + a.Music
 }
 
 // DisplayTitle returns the article title, or synthesizes one from content

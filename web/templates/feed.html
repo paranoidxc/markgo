@@ -79,10 +79,21 @@
 {{ end }}
 {{ end }}
 
+{{ define "music-row" }}
+{{/* Play/pause affordance for the article's single track. The global
+     audio-player module enforces one playing track site-wide. */}}
+{{ if .Music }}
+<div class="feed-music-row">
+    <button type="button" class="feed-music-btn" data-music-src="{{ .MusicSrc }}" aria-label="Play music">&#9654;</button>
+</div>
+{{ end }}
+{{ end }}
+
 {{ define "card-thought" }}
 <article class="feed-card feed-card-thought">
     <div class="feed-card-accent"></div>
-    <div class="feed-card-body">
+    <div class="feed-card-body{{ if .Music }} has-music{{ end }}">
+        {{ template "music-row" . }}
         <div class="feed-card-content thought-content">
             {{ if .ProcessedContent }}
                 {{ .ProcessedContent | safeHTML }}
@@ -98,7 +109,8 @@
 
 {{ define "card-link" }}
 <article class="feed-card feed-card-link">
-    <div class="feed-card-body">
+    <div class="feed-card-body{{ if .Music }} has-music{{ end }}">
+        {{ template "music-row" . }}
         <h2 class="feed-card-title">
             <a href="{{ permalink . }}">{{ .Title }}</a>
         </h2>
@@ -118,7 +130,8 @@
 
 {{ define "card-article" }}
 <article class="feed-card feed-card-article">
-    <div class="feed-card-body">
+    <div class="feed-card-body{{ if .Music }} has-music{{ end }}">
+        {{ template "music-row" . }}
         <h2 class="feed-card-title">
             <a href="{{ permalink . }}">{{ .Title }}</a>
         </h2>
@@ -135,7 +148,8 @@
 
 {{ define "card-ama" }}
 <article class="feed-card feed-card-ama">
-    <div class="feed-card-body">
+    <div class="feed-card-body{{ if .Music }} has-music{{ end }}">
+        {{ template "music-row" . }}
         <div class="feed-card-ama-header">
             <span class="ama-badge">Q</span>
             <div class="feed-card-ama-question">{{ .Question }}</div>

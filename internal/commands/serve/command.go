@@ -275,7 +275,7 @@ func setupServer(cfg *config.Config, logger *slog.Logger) (*gin.Engine, *service
 		middleware.RecoveryWithErrorHandler(logger),
 		middleware.Logger(logger),
 		middleware.Performance(logger),
-		middleware.SmartCacheHeaders(),
+		middleware.SmartCacheHeaders(cfg.Cache.HeaderMaxAge),
 		middleware.CORS(cfg.CORS.AllowedOrigins, cfg.Environment == envDevelopment),
 		middleware.Security(cfg),
 		middleware.RateLimit(cfg.RateLimit.General.Requests, cfg.RateLimit.General.Window),
@@ -387,7 +387,7 @@ func mountStatic(router *gin.Engine, staticSub fs.FS, cfg *config.Config, logger
 	// the operator's file per shadowed path (overlay.localClaims), so embedded
 	// css/js the operator did NOT override still gets gzip/brotli + the version
 	// ETag instead of dropping the whole tree to uncompressed (#128).
-	table := buildPrecompressTable(staticSub, swCacheVersion(constants.AppVersion), logger)
+	table := buildPrecompressTable(staticSub, swCacheVersion(constants.AppVersion, time.Now()), logger)
 	staticGroup := router.Group(staticURLPrefix)
 	staticGroup.Use(precompressedStatic(table, overlay))
 	staticGroup.StaticFS("/", &gin.OnlyFilesFS{FileSystem: staticFS})
@@ -454,7 +454,7 @@ func setupRoutes(router *gin.Engine, h *handlers.Router, sessionStore *middlewar
 	// overlay at <STATIC_PATH>/sw.js serves raw bytes (operator owns their
 	// cache version, bypassing auto-bump). Startup fail-loud if the embedded
 	// placeholder is missing — build invariant.
-	swBody, swModTime, swErr := loadServiceWorker(staticSub, swCacheVersion(constants.AppVersion))
+	swBody, swModTime, swErr := loadServiceWorker(staticSub, swCacheVersion(constants.AppVersion, time.Now()))
 	if swErr != nil {
 		logger.Error("Failed to load embedded sw.js — cannot start server", "error", swErr)
 		os.Exit(1)
@@ -581,6 +581,7 @@ func setupRoutes(router *gin.Engine, h *handlers.Router, sessionStore *middlewar
 			middleware.RateLimit(cfg.RateLimit.Upload.Requests, cfg.RateLimit.Upload.Window),
 			h.Compose.UploadImage)
 		composeGroup.DELETE("/image/:slug/:filename", h.Compose.DeleteImage)
+		composeGroup.DELETE("/upload/:slug/:filename", h.Compose.DeleteUpload)
 		composeGroup.POST("/quick", h.Compose.HandleQuickPublish)
 		composeGroup.POST("/publish/:slug", h.Compose.PublishDraft)
 	}

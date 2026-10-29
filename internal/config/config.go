@@ -111,6 +111,13 @@ type CacheConfig struct {
 	TTL             time.Duration `json:"ttl"`
 	MaxSize         int           `json:"max_size"`
 	CleanupInterval time.Duration `json:"cleanup_interval"`
+	// HeaderMaxAge controls the HTTP Cache-Control header emitted by the
+	// SmartCacheHeaders middleware (applies to HTML pages AND static assets).
+	// Default 1h; set CACHE_HEADER_MAX_AGE=0 to disable caching entirely
+	// (responses get Cache-Control: no-store — useful for development and
+	// for deployments where content must be visible immediately after a
+	// publish).
+	HeaderMaxAge time.Duration `json:"header_max_age"`
 }
 
 // EmailConfig holds email-related configuration options.
@@ -295,6 +302,7 @@ func Load() (*Config, error) {
 			TTL:             getEnvDuration("CACHE_TTL", 1*time.Hour),
 			MaxSize:         getEnvInt("CACHE_MAX_SIZE", 1000),
 			CleanupInterval: getEnvDuration("CACHE_CLEANUP_INTERVAL", 10*time.Minute),
+			HeaderMaxAge:    getEnvDuration("CACHE_HEADER_MAX_AGE", 1*time.Hour),
 		},
 
 		Email: EmailConfig{

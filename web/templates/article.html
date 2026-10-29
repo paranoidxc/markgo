@@ -10,6 +10,9 @@
                         {{ relativeTime .article.Date }}
                     </time>
                 </div>
+                {{ if .article.Music }}
+                <audio class="article-music-player" controls preload="none" src="{{ .article.MusicSrc }}"></audio>
+                {{ end }}
             </header>
             <div class="article-content article-content-thought">
                 <div class="thought-accent"></div>
@@ -33,6 +36,9 @@
                 </div>
                 {{ if .article.Title }}
                 <h1 class="article-title">{{ .article.Title }}</h1>
+                {{ end }}
+                {{ if .article.Music }}
+                <audio class="article-music-player" controls preload="none" src="{{ .article.MusicSrc }}"></audio>
                 {{ end }}
                 {{ if .article.LinkURL }}
                 <a href="{{ .article.LinkURL }}" class="article-link-pill" target="_blank" rel="noopener">
@@ -61,6 +67,9 @@
                     <span class="ama-badge">Q</span>
                     <h1 class="article-title ama-question-title">{{ .article.Question }}</h1>
                 </div>
+                {{ if .article.Music }}
+                <audio class="article-music-player" controls preload="none" src="{{ .article.MusicSrc }}"></audio>
+                {{ end }}
                 {{ if .article.Asker }}
                 <p class="ama-asker">Asked by {{ .article.Asker }}</p>
                 {{ end }}
@@ -94,6 +103,9 @@
                 {{ end }}
                 {{ if .article.Title }}
                 <h1 class="article-title">{{ .article.Title }}</h1>
+                {{ end }}
+                {{ if .article.Music }}
+                <audio class="article-music-player" controls preload="none" src="{{ .article.MusicSrc }}"></audio>
                 {{ end }}
                 {{ if .article.Description }}
                 <p class="article-description">{{ .article.Description }}</p>

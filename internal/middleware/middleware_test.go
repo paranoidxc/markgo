@@ -914,7 +914,7 @@ func TestCSRF_CookieStability(t *testing.T) {
 // TestSmartCacheHeaders tests the smart cache headers middleware
 func TestSmartCacheHeaders(t *testing.T) {
 	router := setupTestRouter()
-	router.Use(SmartCacheHeaders())
+	router.Use(SmartCacheHeaders(1 * time.Hour))
 	router.GET("/test", func(c *gin.Context) {
 		c.String(200, "ok")
 	})
@@ -926,4 +926,20 @@ func TestSmartCacheHeaders(t *testing.T) {
 
 	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, "public, max-age=3600", w.Header().Get("Cache-Control"))
+}
+
+func TestSmartCacheHeaders_Disabled(t *testing.T) {
+	router := setupTestRouter()
+	router.Use(SmartCacheHeaders(0))
+	router.GET("/test", func(c *gin.Context) {
+		c.String(200, "ok")
+	})
+
+	req := httptest.NewRequest("GET", "/test", http.NoBody)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
 }

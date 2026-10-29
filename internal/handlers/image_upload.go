@@ -144,3 +144,35 @@ func (h *ComposeHandler) DeleteImage(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
+
+// DeleteUpload handles DELETE /compose/upload/:slug/:filename for removing a
+// single generic upload (e.g. the compose music area's replaced track). No
+// thumbnail pairing is assumed — exactly one file is removed.
+func (h *ComposeHandler) DeleteUpload(c *gin.Context) {
+	slug := c.Param("slug")
+	filename := c.Param("filename")
+	if !slugutil.WellFormed(slug) || filename == "" || filepath.Base(filename) != filename || filename == "." || filename == ".." {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	slugDir, err := slugutil.ContainPath(h.config.Upload.Path, slug)
+	if err != nil {
+		h.logger.Error("Upload delete slug containment failed", "slug", slug, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid upload path"})
+		return
+	}
+
+	if err := os.Remove(filepath.Join(slugDir, filename)); err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+			return
+		}
+		h.logger.Error("Upload delete failed", "slug", slug, "filename", filename, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete file"})
+		return
+	}
+	h.logger.Info("Upload file deleted", "slug", slug, "filename", filename)
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}

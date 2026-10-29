@@ -84,6 +84,32 @@ func TestOrphanSweep_GalleryImagesAndThumbsProtected(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "unreferenced file should be swept")
 }
 
+func TestOrphanSweep_MusicProtected(t *testing.T) {
+	uploadDir := t.TempDir()
+	slug := "song-post"
+	musicPath := stageOrphanFile(t, uploadDir, slug, "track-ab12cd34.mp3")
+	orphanPath := stageOrphanFile(t, uploadDir, slug, "removed.mp3")
+
+	article := &models.Article{
+		Slug:  slug,
+		Music: "/uploads/" + slug + "/track-ab12cd34.mp3",
+	}
+
+	cleaned, errs := OrphanSweep(
+		context.Background(),
+		[]*models.Article{article},
+		uploadDir,
+		quietSweepLogger(),
+	)
+
+	assert.Empty(t, errs)
+	assert.Equal(t, 1, cleaned)
+	_, err := os.Stat(musicPath)
+	assert.NoError(t, err, "music file must survive sweep")
+	_, err = os.Stat(orphanPath)
+	assert.True(t, os.IsNotExist(err), "unreferenced file should be swept")
+}
+
 func TestOrphanSweep_DeletesUnreferencedOrphan(t *testing.T) {
 	uploadDir := t.TempDir()
 	orphanPath := stageOrphanFile(t, uploadDir, "stale-slug", "orphan.png")

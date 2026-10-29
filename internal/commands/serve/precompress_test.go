@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/andybalholm/brotli"
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,7 @@ func newStaticRouter(fsys fstest.MapFS, version string) *gin.Engine {
 	// SmartCacheHeaders mirrors production: it sets Cache-Control: max-age=3600
 	// globally before the handler runs, so every Cache-Control: no-cache
 	// assertion below proves precompressedStatic *overrides* it, not just sets it.
-	r.Use(middleware.SmartCacheHeaders())
+	r.Use(middleware.SmartCacheHeaders(time.Hour))
 	r.Use(middleware.DiscardBodyOnHEAD())
 	table := buildPrecompressTable(fsys, version, discardLogger())
 	g := r.Group("/static")
@@ -56,7 +57,7 @@ func newStaticRouter(fsys fstest.MapFS, version string) *gin.Engine {
 func newOverlayStaticRouter(embedded, local fstest.MapFS, version string) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(middleware.SmartCacheHeaders())
+	r.Use(middleware.SmartCacheHeaders(time.Hour))
 	r.Use(middleware.DiscardBodyOnHEAD())
 	table := buildPrecompressTable(embedded, version, discardLogger())
 	overlay := newOverlayFS(http.FS(local), http.FS(embedded), discardLogger())
@@ -446,7 +447,7 @@ func TestPrecompressedStatic_OverlayNonENOENTFallsThrough(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.Use(middleware.SmartCacheHeaders())
+	r.Use(middleware.SmartCacheHeaders(time.Hour))
 	g := r.Group("/static")
 	g.Use(precompressedStatic(table, overlay))
 	g.StaticFS("/", &gin.OnlyFilesFS{FileSystem: overlay})

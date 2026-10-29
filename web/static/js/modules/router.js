@@ -17,6 +17,8 @@
  */
 
 // Routes that always need a full page load
+import { stopFeedAudio } from './audio-player.js';
+
 const BYPASS = new Set(['/logout', '/feed.xml', '/feed.json', '/sitemap.xml', '/robots.txt', '/manifest.json', '/health', '/sw.js']);
 const BYPASS_PREFIXES = ['/static/', '/uploads/', '/api/', '/debug/', '/compose/preview', '/compose/upload'];
 
@@ -195,6 +197,10 @@ async function navigate(url, { push = true } = {}) {
 
         // Swap content
         main.replaceChildren(...page.main.childNodes);
+
+        // Stop any feed audio still playing from the previous page so
+        // playback never leaks across SPA navigations.
+        stopFeedAudio();
 
         // Update document state
         document.title = page.title;

@@ -51,8 +51,10 @@ func (h *captureHandler) warnings() []string {
 }
 
 // TestSwCacheVersion: the three cases that determine cache-name shape —
-// stamped build, "dev" (or empty) build, and leading-v strip.
+// stamped build, "dev" (or empty) build rotating per startup, and
+// leading-v strip.
 func TestSwCacheVersion(t *testing.T) {
+	now := time.Unix(1793244000, 0)
 	cases := []struct {
 		name string
 		in   string
@@ -60,12 +62,13 @@ func TestSwCacheVersion(t *testing.T) {
 	}{
 		{"semver with leading v", "v3.17.0", "3.17.0"},
 		{"semver without leading v", "3.17.0", "3.17.0"},
-		{"empty falls back to dev", "", "dev"},
-		{"literal v alone strips to empty then dev", "v", "dev"},
+		{"empty rotates per startup", "", "dev-1793244000"},
+		{"literal dev rotates per startup", "dev", "dev-1793244000"},
+		{"literal v alone strips to empty then rotates", "v", "dev-1793244000"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := swCacheVersion(tc.in); got != tc.want {
+			if got := swCacheVersion(tc.in, now); got != tc.want {
 				t.Errorf("swCacheVersion(%q) = %q, want %q", tc.in, got, tc.want)
 			}
 		})
@@ -140,17 +143,18 @@ func TestServeSwJs_EmbeddedSubstitutesVersion(t *testing.T) {
 }
 
 // TestServeSwJs_DevFallbackInCacheNames: with empty version → cache names
-// embed "dev" (via swCacheVersion fallback). Composes the two helpers.
+// embed the per-startup "dev-<unix>" stamp (via swCacheVersion fallback).
+// Composes the two helpers.
 func TestServeSwJs_DevFallbackInCacheNames(t *testing.T) {
 	embedded := fstest.MapFS{
 		"sw.js": &fstest.MapFile{Data: []byte("const CACHE_VERSION = '__MARKGO_CACHE_VERSION__';")},
 	}
-	body, modTime, err := loadServiceWorker(embedded, swCacheVersion(""))
+	body, modTime, err := loadServiceWorker(embedded, swCacheVersion("", time.Now()))
 	if err != nil {
 		t.Fatalf("loadServiceWorker: %v", err)
 	}
-	if !strings.Contains(string(body), "'dev'") {
-		t.Errorf("expected 'dev' fallback in body, got %q", string(body))
+	if !strings.Contains(string(body), "'dev-") {
+		t.Errorf("expected 'dev-<unix>' fallback in body, got %q", string(body))
 	}
 
 	gin.SetMode(gin.TestMode)
@@ -165,8 +169,8 @@ func TestServeSwJs_DevFallbackInCacheNames(t *testing.T) {
 	}
 	defer resp.Body.Close()
 	served, _ := io.ReadAll(resp.Body)
-	if !strings.Contains(string(served), "'dev'") {
-		t.Errorf("served body missing 'dev': %q", string(served))
+	if !strings.Contains(string(served), "'dev-") {
+		t.Errorf("served body missing 'dev-<unix>' stamp: %q", string(served))
 	}
 }
 

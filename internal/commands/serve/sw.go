@@ -23,14 +23,16 @@ const cacheVersionPlaceholder = "__MARKGO_CACHE_VERSION__"
 
 // swCacheVersion derives the cache-version string from a build-time semver.
 // Strips a leading "v" so cache names read e.g. "markgo-precache-v3.17.0"
-// rather than "markgo-precache-vv3.17.0". Empty input falls back to "dev"
-// so unstamped builds (make dev / air live-reload) still produce valid
-// cache names; the per-instance staleness during dev iteration is
-// resolved by browser SW byte-change detection, not by the cache name.
-func swCacheVersion(buildVersion string) string {
+// rather than "markgo-precache-vv3.17.0". Empty input falls back to a
+// per-startup "dev-<unix>" stamp so unstamped builds (make dev / air
+// live-reload / plain go build) rotate their SW cache names on every server
+// restart — otherwise a stale CacheStorage from a previous dev binary keeps
+// serving old CSS/JS forever, because activate-cleanup only removes caches
+// whose NAME differs, and "dev" never does.
+func swCacheVersion(buildVersion string, now time.Time) string {
 	v := strings.TrimPrefix(buildVersion, "v")
-	if v == "" {
-		return "dev"
+	if v == "" || v == "dev" {
+		return fmt.Sprintf("dev-%d", now.Unix())
 	}
 	return v
 }
@@ -51,6 +53,6 @@ func loadServiceWorker(embedded fs.FS, version string) ([]byte, time.Time, error
 	if !bytes.Contains(raw, []byte(cacheVersionPlaceholder)) {
 		return nil, time.Time{}, fmt.Errorf("embedded sw.js missing %s placeholder", cacheVersionPlaceholder)
 	}
-	substituted := bytes.ReplaceAll(raw, []byte(cacheVersionPlaceholder), []byte(version))
+	substituted := bytes.ReplaceAll(raw, []byte(cacheVersionPlaceholder), []byte(swCacheVersion(version, time.Now())))
 	return substituted, time.Now(), nil
 }

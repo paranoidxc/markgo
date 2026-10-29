@@ -261,3 +261,122 @@
 .compose-gallery-status.upload-success {
     color: var(--color-success);
 }
+
+/* ── Feed music row (play/pause per card) ──────────────────────────────── */
+
+/* Left/right layout when the card has music (template adds .has-music):
+   two-column grid — play button in the narrow left column on row 1, all
+   content in the right column. Explicit single-row placement (no span)
+   keeps the card's natural height. Button is 36px so it sits level with
+   the title line instead of towering above it. */
+.feed-card-body.has-music {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+    align-items: start;
+}
+
+.feed-card-body.has-music > * {
+    grid-column: 2;
+}
+
+.feed-card-body.has-music > .feed-music-row {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.feed-music-row {
+    display: flex;
+    align-items: center;
+}
+
+.feed-music-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid var(--color-border-dark);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.feed-music-btn:hover,
+.feed-music-btn-playing {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ── Article native music player ───────────────────────────────────────── */
+
+.article-music-player {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    height: 40px;
+    margin: var(--spacer-8, 8px) 0 var(--spacer-16, 16px);
+}
+
+/* ── Compose music area ────────────────────────────────────────────────── */
+
+.compose-music {
+    border: 1px dashed var(--color-border-dark);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+}
+
+.compose-music-track {
+    display: flex;
+    align-items: center;
+    gap: var(--spacer-8, 8px);
+    margin-bottom: var(--spacer-8, 8px);
+}
+
+.compose-music-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.compose-music-play,
+.compose-music-remove {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--color-border-dark);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.compose-music-play:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.compose-music-remove:hover {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+.compose-music-play[disabled],
+.compose-music-remove[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

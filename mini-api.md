@@ -66,3 +66,48 @@ Compose 页新增的独立图片区域：拖拽/多选上传 → 服务端自动
 - 每块 `data-gallery-index` + 容器 `data-full-urls`（逗号分隔的全尺寸 URL，含未显示项）
 - 点击打开 Lightbox：[web/static/js/modules/lightbox.js](web/static/js/modules/lightbox.js)（左右切换 / Esc / 遮罩关闭）
 - Compose 图片区交互：[web/static/js/modules/compose-images.js](web/static/js/modules/compose-images.js)；样式 [web/static/css/gallery.css](web/static/css/gallery.css)
+
+---
+
+# mini-api.md — Music 区域（单曲音频）接口文档
+
+Compose 页新增独立 Music 区域：单文件音频上传 → frontmatter `music` → 首页卡片左侧播放按钮（全局单播，不并发）→ 文章页标题下方原生 `<audio controls>`。
+
+## 1. 上传音乐
+
+| 项 | 值 |
+|---|---|
+| 名称 | 上传音乐（单曲，替换语义） |
+| 地址 | `POST /compose/upload/:slug`（复用通用上传端点） |
+| 认证 | 会话 Cookie + CSRF（`X-CSRF-Token`） |
+| 限流 | `RateLimit.Upload`（与图片一致） |
+| 参数 | `file`：form-file，音频（mp3/m4a/aac/ogg/oga/opus/wav/flac/weba，`accept="audio/*"`） |
+| 响应 | `{"filename","markdown","url"}`，前端取 `url` 存入隐藏字段 |
+
+**实现点**：[internal/handlers/upload.go](internal/handlers/upload.go) `ComposeHandler.Upload`。前端选择文件后先 DELETE 旧曲目再上传，保证每篇文章只有一个音频文件（[web/static/js/modules/compose-music.js](web/static/js/modules/compose-music.js)）。
+
+## 2. 删除音乐（通用上传删除）
+
+| 项 | 值 |
+|---|---|
+| 名称 | 删除单个上传文件（无缩略图配对） |
+| 地址 | `DELETE /compose/upload/:slug/:filename` |
+| 实现点 | [internal/handlers/image_upload.go](internal/handlers/image_upload.go) `ComposeHandler.DeleteUpload` |
+
+路径穿越 filename 返回 400；文件不存在返回 404。Compose 移除按钮与"上传替换"都调用此端点。
+
+## 3. 提交文章（music 字段）
+
+`POST /compose` 与 `POST /compose/edit/:slug` 的表单新增隐藏字段 `music`：单个 `/uploads/<slug>/<filename>` URL。
+
+- 解析校验：[internal/services/compose/music.go](internal/services/compose/music.go) `ParseMusicInput` — 仅接受本 slug 名下、单段安全文件名且扩展名在音频白名单内，否则归空（无曲目）
+- 持久化：frontmatter `music: ""`（[internal/models/article.go](internal/models/article.go) `Article.Music`）；空值时从 frontmatter 删除该字段
+- 编辑清理：`HandleEdit` 更新前读 `PrevMusic`，更新后 `UnlinkRemovedMusic` 删除被替换/移除的文件（实现点：[internal/handlers/compose.go](internal/handlers/compose.go) `HandleEdit`）
+- 孤儿清理：[internal/services/article/sweep.go](internal/services/article/sweep.go) `addMusicRef` 已把 music 纳入引用集合，定时清理不会误删
+
+## 4. 渲染与播放
+
+- 模板输出 `Article.MusicSrc`（[internal/models/article.go](internal/models/article.go)）：绝对 URL / 服务器路径直通，裸文件名解析为 `/uploads/<slug>/<name>`
+- 首页卡片（thought/link/article/ama）：标题区圆形播放按钮 `data-music-src`，[web/static/js/modules/audio-player.js](web/static/js/modules/audio-player.js) 全局维护唯一 Audio 实例 — 点击另一卡片先停掉当前播放；SPA 换页时 router 调 `stopFeedAudio()` 防止跨页泄漏
+- 文章页：标题下方 `<audio class="article-music-player" controls preload="none">`（[web/templates/article.html](web/templates/article.html)），浏览器原生控件，无需 JS
+- Compose Music 区交互：[web/static/js/modules/compose-music.js](web/static/js/modules/compose-music.js)（试听 ▶/⏸、× 移除、替换上传）

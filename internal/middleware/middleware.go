@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -421,10 +422,18 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 	})
 }
 
-// SmartCacheHeaders adds basic cache headers
-func SmartCacheHeaders() gin.HandlerFunc {
+// SmartCacheHeaders adds basic cache headers. maxAge is the Cache-Control
+// lifetime applied to every response (HTML pages and static assets alike).
+// A maxAge <= 0 disables client caching entirely: responses are marked
+// `no-store` so browsers always re-fetch (development mode, or deployments
+// where publishes must be visible immediately).
+func SmartCacheHeaders(maxAge time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Header("Cache-Control", "public, max-age=3600")
+		if maxAge <= 0 {
+			c.Header("Cache-Control", "no-store")
+		} else {
+			c.Header("Cache-Control", "public, max-age="+strconv.Itoa(int(maxAge.Seconds())))
+		}
 		c.Next()
 	}
 }

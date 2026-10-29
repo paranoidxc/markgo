@@ -47,6 +47,13 @@ build: ## Build unified CLI binary (includes all commands)
 	CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "✓ Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
+linux: ## Build for all platforms (Linux, macOS, Windows)
+	@echo "Building linux release binaries..."
+	@mkdir -p $(BUILD_DIR)
+	@echo "  Linux amd64..."
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 $(MAIN_PATH)
+	@echo "✓ Release builds complete"
+
 build-release: ## Build for all platforms (Linux, macOS, Windows)
 	@echo "Building release binaries..."
 	@mkdir -p $(BUILD_DIR)

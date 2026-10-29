@@ -47,7 +47,10 @@ type Input struct {
 	// Images is the gallery list uploaded via the compose image area.
 	// Entries are validated /uploads/<slug>/<filename> URLs (see
 	// ParseImagesInput) and stored in frontmatter as `images`.
-	Images     []string `json:"images"`
+	Images []string `json:"images"`
+	// Music is the article's single audio track, validated like Images
+	// (see ParseMusicInput) and stored in frontmatter as `music`.
+	Music      string   `json:"music"`
 	Draft      bool     `json:"draft"`
 	Asker      string   `json:"asker"`
 	AskerEmail string   `json:"asker_email"`
@@ -138,6 +141,9 @@ func (s *Service) CreatePost(input *Input) (string, error) {
 	}
 	if len(input.Images) > 0 {
 		fm["images"] = input.Images
+	}
+	if input.Music != "" {
+		fm["music"] = input.Music
 	}
 	setIfNonEmpty(fm, "author", s.defaultAuthor)
 	setIfNonEmpty(fm, "type", input.Type)
@@ -237,6 +243,9 @@ func (s *Service) LoadArticle(slug string) (*Input, error) {
 			}
 		}
 	}
+	if music, ok := fm["music"].(string); ok {
+		input.Music = music
+	}
 	if draft, ok := fm["draft"].(bool); ok {
 		input.Draft = draft
 	}
@@ -329,6 +338,14 @@ func (s *Service) UpdateArticle(slug string, input *Input) (prevBanner string, e
 		fm["images"] = input.Images
 	} else {
 		delete(fm, "images")
+	}
+
+	// Music (single track): set-or-delete. Callers clean up the replaced
+	// file via UnlinkRemovedMusic.
+	if input.Music != "" {
+		fm["music"] = input.Music
+	} else {
+		delete(fm, "music")
 	}
 
 	fm["draft"] = input.Draft
