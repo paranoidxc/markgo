@@ -13,7 +13,7 @@ import { init as initTheme } from './modules/theme.js';
 import { init as initHighlight } from './modules/highlight.js';
 import { init as initScroll } from './modules/scroll.js';
 import { init as initLazy } from './modules/lazy.js';
-import { initImageGalleries } from './modules/lightbox.js';
+import { initImageGalleries, initContentImages } from './modules/lightbox.js';
 import { initFeedAudio, stopFeedAudio } from './modules/audio-player.js';
 import { init as initLogin } from './modules/login.js';
 import { init as initToast, showToast } from './modules/toast.js';
@@ -99,6 +99,7 @@ function reinitPage(template) {
     initHighlight();
     initLazy();
     initImageGalleries();
+    initContentImages();
     initFeedAudio();
     loadPageModule(template);
 }
@@ -220,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initHighlight();
     initLazy();
     initImageGalleries();
+    initContentImages();
     initFeedAudio();
 
     // Page-specific module — initial page

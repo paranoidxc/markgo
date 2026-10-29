@@ -1,10 +1,12 @@
-// Package imaging provides server-side image processing for compose gallery
-// uploads: a downscaled re-encode of the full image (compression) and a square
-// center-crop thumbnail for the nine-grid display.
+// Package imaging provides server-side image processing for compose uploads:
+// a downscaled re-encode of the full image (compression), a square center-crop
+// thumbnail for the nine-grid gallery, and a proportional "content" derivative
+// that markdown bodies display inline (the full-size file is only loaded when
+// the reader opens the lightbox).
 //
 // Supported inputs: JPEG, PNG, GIF, WebP (decode-only, via golang.org/x/image).
 // Outputs: JPEG for opaque sources and animated-GIF fulls, PNG when the source
-// is a PNG with transparency (alpha preserved on full and thumb).
+// is a PNG with transparency (alpha preserved on full, content and thumb).
 package imaging
 
 import (
@@ -26,6 +28,11 @@ const (
 	// MaxDimension caps the longest edge of the stored full image. Larger
 	// sources are proportionally downscaled before re-encode.
 	MaxDimension = 2048
+	// ContentDimension caps the longest edge of the inline content derivative.
+	// It is the width a markdown body actually renders at (a reading column is
+	// ~700px; 1280 keeps it sharp on 2x displays) while staying far smaller
+	// than the full image.
+	ContentDimension = 1280
 	// ThumbSize is the edge length of the square thumbnail. Sources whose
 	// short edge is smaller are never upscaled.
 	ThumbSize = 480
@@ -33,8 +40,9 @@ const (
 	// pixels than this are rejected outright.
 	MaxPixels = 40 << 20 // 40 megapixels
 
-	jpegQuality  = 85
-	thumbQuality = 82
+	jpegQuality    = 85
+	contentQuality = 82
+	thumbQuality   = 82
 )
 
 // Result carries the processed outputs of one uploaded image.
@@ -44,6 +52,12 @@ type Result struct {
 	// FullExt is the extension to store Full under: ".jpg", ".png", or
 	// ".gif" (animated GIFs pass through byte-for-byte).
 	FullExt string
+	// Content is the proportional downscale used inline by markdown bodies.
+	// It is nil when the source is already small enough to be served as-is
+	// (see ContentName for the naming convention).
+	Content []byte
+	// ContentExt is the extension to store Content under: ".jpg" or ".png".
+	ContentExt string
 	// Thumb is the square center-crop thumbnail.
 	Thumb []byte
 	// ThumbExt is the extension to store Thumb under: ".jpg" or ".png".
@@ -54,9 +68,10 @@ type Result struct {
 }
 
 // Process decodes src and returns the compressed full image plus a square
-// center-crop thumbnail. Animated GIFs are preserved byte-for-byte as the
-// full image (re-encoding would drop animation); their thumbnail is rendered
-// from the first frame.
+// center-crop thumbnail and the inline content derivative. Animated GIFs are
+// preserved byte-for-byte as the full image (re-encoding would drop animation);
+// their thumbnail is rendered from the first frame and no content derivative is
+// produced, so the animation survives in the body too.
 func Process(src []byte) (*Result, error) {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(src))
 	if err != nil {
@@ -106,18 +121,25 @@ func Process(src []byte) (*Result, error) {
 		return nil, err
 	}
 
+	content, contentExt, err := buildContent(img, format == "png" && alpha)
+	if err != nil {
+		return nil, err
+	}
+
 	thumb, thumbExt, err := buildThumb(img, format == "png" && alpha)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Result{
-		Full:     fullBytes,
-		FullExt:  fullExt,
-		Thumb:    thumb,
-		ThumbExt: thumbExt,
-		Width:    fullW,
-		Height:   fullH,
+		Full:       fullBytes,
+		FullExt:    fullExt,
+		Content:    content,
+		ContentExt: contentExt,
+		Thumb:      thumb,
+		ThumbExt:   thumbExt,
+		Width:      fullW,
+		Height:     fullH,
 	}, nil
 }
 
@@ -146,6 +168,35 @@ func ThumbName(filename string) string {
 	return base + "-thumb" + thumbExt
 }
 
+// ContentName derives the inline content derivative's filename for an uploaded
+// image filename, mirroring the pairing the upload handler writes to disk:
+//
+//	"a-b.jpg" -> "a-b-content.jpg"
+//	"a.png"   -> "a-content.png"
+//	"a.gif"   -> "a-content.jpg" (animated fulls have no derivative; the name
+//	                             simply never resolves to a file)
+//
+// Files without a recognizable extension — and sources stored byte-for-byte
+// because they were already small enough — are returned unchanged, so callers
+// never derive a name that was never written.
+func ContentName(filename string) string {
+	ext := lowerExt(filename)
+	if ext == "" {
+		return filename
+	}
+	base := filename[:len(filename)-len(ext)]
+	var contentExt string
+	switch ext {
+	case ".png":
+		contentExt = ".png"
+	case ".jpg", ".jpeg", ".gif":
+		contentExt = ".jpg"
+	default:
+		return filename
+	}
+	return base + "-content" + contentExt
+}
+
 // buildThumb center-crops img to a square (short edge, centered) and scales
 // it to ThumbSize without upscaling. keepAlpha selects PNG output so
 // transparent PNGs keep their transparency in the grid.
@@ -169,6 +220,29 @@ func buildThumb(img image.Image, keepAlpha bool) ([]byte, string, error) {
 	}
 	// JPEG has no alpha — flatten onto white first.
 	err = jpeg.Encode(&buf, flatten(dst), &jpeg.Options{Quality: thumbQuality})
+	return buf.Bytes(), ".jpg", err
+}
+
+// buildContent produces the proportional downscale that markdown bodies embed.
+// It returns (nil, "") when the source is already within ContentDimension —
+// the full image is small enough to serve inline, so no duplicate is written.
+// PNGs with transparency stay PNG (a flattened JPEG would blacken the
+// background); everything else goes to JPEG.
+func buildContent(img image.Image, keepAlpha bool) ([]byte, string, error) {
+	b := img.Bounds()
+	if max(b.Dx(), b.Dy()) <= ContentDimension {
+		return nil, "", nil
+	}
+
+	scaled := resizeToFit(img, ContentDimension)
+
+	var buf bytes.Buffer
+	var err error
+	if keepAlpha {
+		err = png.Encode(&buf, scaled)
+		return buf.Bytes(), ".png", err
+	}
+	err = jpeg.Encode(&buf, flatten(scaled), &jpeg.Options{Quality: contentQuality})
 	return buf.Bytes(), ".jpg", err
 }
 

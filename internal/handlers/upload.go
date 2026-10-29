@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	apperrors "github.com/1mb-dev/markgo/internal/errors"
+	"github.com/1mb-dev/markgo/internal/imaging"
 	slugutil "github.com/1mb-dev/markgo/internal/slug"
 )
 
@@ -53,16 +54,69 @@ func sanitizeFilename(name string) string {
 	return name
 }
 
-// cleanupTempFile removes a temporary file, logging on failure.
-func (h *ComposeHandler) cleanupTempFile(path string) {
-	if removeErr := os.Remove(path); removeErr != nil {
-		h.logger.Error("Failed to remove temp file", "path", path, "error", removeErr)
+// writeUploadFile writes one upload artefact, making sure it is world-readable
+// but never executable.
+func writeUploadFile(dir, name string, data []byte) error {
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec // uploaded files must be readable by the web server
+		return err
 	}
+	return nil
+}
+
+// processedImage is the result of storing an image upload: the full file's name
+// plus its companion thumbnail, all already written under the slug directory.
+type processedImage struct {
+	name   string
+	thumb  string
+	width  int
+	height int
+}
+
+// saveProcessedImage stores an image upload as three artefacts under dir:
+//
+//	<stem>.jpg         full size, capped at imaging.MaxDimension (lightbox)
+//	<stem>-thumb.jpg   square crop (nine-grid gallery / compose tiles)
+//	<stem>-content.jpg proportional downscale (markdown bodies)
+//
+// Skipping a derivative the source doesn't need (a small image, an animated
+// GIF) is handled by imaging.Process, which simply returns no bytes for it.
+func (h *ComposeHandler) saveProcessedImage(dir, stem string, src []byte) (*processedImage, error) {
+	res, err := imaging.Process(src)
+	if err != nil {
+		return nil, err
+	}
+
+	name := stem + res.FullExt
+	if err := writeUploadFile(dir, name, res.Full); err != nil {
+		return nil, err
+	}
+
+	var thumb string
+	if len(res.Thumb) > 0 {
+		thumb = imaging.ThumbName(name)
+		if err := writeUploadFile(dir, thumb, res.Thumb); err != nil {
+			return nil, err
+		}
+	}
+	if len(res.Content) > 0 {
+		if err := writeUploadFile(dir, imaging.ContentName(name), res.Content); err != nil {
+			return nil, err
+		}
+	}
+
+	return &processedImage{name: name, thumb: thumb, width: res.Width, height: res.Height}, nil
 }
 
 // Upload handles file upload for the compose page.
 // Files are scoped to a slug directory: {config.Upload.Path}/{slug}/{filename}.
 // Extension-based blocklist rejects executables, scripts, and HTML-renderable types; all others are allowed.
+//
+// Images are decoded and re-encoded server-side (see imaging.Process) so a
+// markdown body never embeds the camera original: the returned markdown points
+// at the full file, and the renderer swaps in the downscaled content
+// derivative, linking back to the full image for the lightbox. Anything the
+// decoder rejects is stored verbatim rather than failing the upload.
 func (h *ComposeHandler) Upload(c *gin.Context) {
 	slug := c.Param("slug")
 	if !slugutil.WellFormed(slug) {
@@ -96,14 +150,6 @@ func (h *ComposeHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	safeName := sanitizeFilename(header.Filename)
-	randBytes := make([]byte, 4)
-	if _, randErr := rand.Read(randBytes); randErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
-		return
-	}
-	filename := fmt.Sprintf("%d-%s-%s%s", time.Now().UnixMilli(), safeName, hex.EncodeToString(randBytes), ext)
-
 	uploadDir, containErr := slugutil.ContainPath(h.config.Upload.Path, slug)
 	if containErr != nil {
 		if errors.Is(containErr, apperrors.ErrPathEscape) {
@@ -121,52 +167,69 @@ func (h *ComposeHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	destPath := filepath.Join(uploadDir, filename)
-
-	// Atomic write: temp file + rename
-	tmpFile, err := os.CreateTemp(uploadDir, "upload-*")
-	if err != nil {
-		h.logger.Error("Failed to create temp file", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
-		return
-	}
-	tmpPath := tmpFile.Name()
-
-	if _, copyErr := io.Copy(tmpFile, file); copyErr != nil {
-		_ = tmpFile.Close()
-		h.cleanupTempFile(tmpPath)
-		h.logger.Error("Failed to write file", "error", copyErr)
+	// Read once: images go through the decoder and, on failure, reuse the same
+	// bytes for the verbatim path. MaxBytesReader bounds the allocation.
+	src, readErr := io.ReadAll(file)
+	if readErr != nil {
+		if isBodyTooLarge(readErr) {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{
+				"error": fmt.Sprintf("File exceeds %d MB limit", maxSize>>20),
+			})
+			return
+		}
+		h.logger.Error("Failed to read upload", "error", readErr)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
 		return
 	}
 
-	if closeErr := tmpFile.Close(); closeErr != nil {
-		h.cleanupTempFile(tmpPath)
-		h.logger.Error("Failed to close temp file", "error", closeErr)
+	randBytes := make([]byte, 4)
+	if _, randErr := rand.Read(randBytes); randErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
+		return
+	}
+	stem := fmt.Sprintf("%d-%s-%s", time.Now().UnixMilli(), sanitizeFilename(header.Filename), hex.EncodeToString(randBytes))
+
+	if imageExtensions[ext] {
+		img, imgErr := h.saveProcessedImage(uploadDir, stem, src)
+		if imgErr != nil {
+			// Undecodable image (or a write failure): fall through and keep the
+			// bytes verbatim rather than rejecting the author's file.
+			h.logger.Warn("Upload image processing failed; storing original",
+				"slug", slug, "filename", header.Filename, "extension", ext, "error", imgErr)
+		} else {
+			url := imaging.UploadPrefix + slug + "/" + img.name
+			thumb := ""
+			if img.thumb != "" {
+				thumb = imaging.UploadPrefix + slug + "/" + img.thumb
+			}
+			h.logger.Info("Image uploaded",
+				"slug", slug, "filename", img.name,
+				"bytes", len(src), "width", img.width, "height", img.height)
+			c.JSON(http.StatusOK, gin.H{
+				"url":      url,
+				"thumb":    thumb,
+				"markdown": fmt.Sprintf("![%s](%s)", sanitizeFilename(header.Filename), url),
+				"filename": img.name,
+				"width":    img.width,
+				"height":   img.height,
+			})
+			return
+		}
+	}
+
+	filename := stem + ext
+	if err := writeUploadFile(uploadDir, filename, src); err != nil {
+		h.logger.Error("Failed to write uploaded file", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
 		return
 	}
 
-	if renameErr := os.Rename(tmpPath, destPath); renameErr != nil {
-		h.cleanupTempFile(tmpPath)
-		h.logger.Error("Failed to rename uploaded file", "error", renameErr)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
-		return
-	}
-
-	if chmodErr := os.Chmod(destPath, 0o644); chmodErr != nil { //nolint:gosec // uploaded files must be readable by web server
-		h.logger.Error("Failed to chmod uploaded file", "path", destPath, "error", chmodErr)
-		h.cleanupTempFile(destPath)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Upload failed"})
-		return
-	}
-
-	url := fmt.Sprintf("/uploads/%s/%s", slug, filename)
+	url := fmt.Sprintf("%s%s/%s", imaging.UploadPrefix, slug, filename)
 	var markdown string
 	if imageExtensions[ext] {
-		markdown = fmt.Sprintf("![%s](%s)", safeName, url)
+		markdown = fmt.Sprintf("![%s](%s)", sanitizeFilename(header.Filename), url)
 	} else {
-		markdown = fmt.Sprintf("[%s](%s)", safeName, url)
+		markdown = fmt.Sprintf("[%s](%s)", sanitizeFilename(header.Filename), url)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

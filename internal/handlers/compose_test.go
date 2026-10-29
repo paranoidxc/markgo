@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/color"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -22,7 +23,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/1mb-dev/markgo/internal/config"
+	"github.com/1mb-dev/markgo/internal/imaging"
 	"github.com/1mb-dev/markgo/internal/models"
+	"github.com/1mb-dev/markgo/internal/services"
 	"github.com/1mb-dev/markgo/internal/services/compose"
 )
 
@@ -163,6 +166,23 @@ func TestSanitizeFilename(t *testing.T) {
 // Preview handler tests
 // ---------------------------------------------------------------------------
 
+// The preview sanitizer must keep the click-to-zoom wrapper the markdown
+// renderer puts around upload images, or the preview contradicts the page.
+func TestPreviewSanitizerKeepsContentImageMarkup(t *testing.T) {
+	in := `<p><a class="content-image-link" href="/uploads/a/b.jpg">` +
+		`<img class="content-image" src="/uploads/a/b-content.jpg" width="1280" height="720" ` +
+		`loading="lazy" decoding="async" alt="b"></a></p><script>alert(1)</script>`
+
+	out := services.ContentHTMLPolicy().Sanitize(in)
+
+	assert.Contains(t, out, `class="content-image-link"`)
+	assert.Contains(t, out, `class="content-image"`)
+	assert.Contains(t, out, `loading="lazy"`)
+	assert.Contains(t, out, `decoding="async"`)
+	assert.Contains(t, out, `src="/uploads/a/b-content.jpg"`)
+	assert.NotContains(t, out, "<script")
+}
+
 func TestPreview(t *testing.T) {
 	t.Run("valid markdown returns HTML", func(t *testing.T) {
 		handler, _ := createTestComposeHandler(t, &MockMarkdownRenderer{
@@ -246,34 +266,96 @@ func TestPreview(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestUpload(t *testing.T) {
-	t.Run("valid JPEG upload returns image markdown", func(t *testing.T) {
+	t.Run("image upload stores processed full and thumb", func(t *testing.T) {
 		handler, tmpDir := createTestComposeHandler(t, nil)
 
-		req := createMultipartRequest(t, "file", "test-photo.jpg", minimalJPEG, nil)
+		src := solidTestJPEG(t, 800, 600, color.RGBA{R: 200, G: 60, B: 40, A: 255})
+		req := createMultipartRequest(t, "file", "test-photo.jpg", src, nil)
 		w := httptest.NewRecorder()
 
 		router := gin.New()
 		router.POST("/compose/upload/:slug", handler.Upload)
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-		var resp map[string]string
+		var resp map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.Contains(t, resp["url"], "/uploads/test-article/")
 		assert.Contains(t, resp["url"], ".jpg")
 		assert.Contains(t, resp["markdown"], "![test-photo]")
 		assert.NotEmpty(t, resp["filename"])
 
-		// Verify file exists on disk with correct permissions
+		// Uploads are re-encoded server-side: the full file plus its square
+		// thumbnail land on disk. An 800px source needs no content derivative
+		// (it is already smaller than the reading column).
+		full := resp["filename"].(string)
 		uploadDir := filepath.Join(tmpDir, "uploads", "test-article")
 		files, err := os.ReadDir(uploadDir)
 		require.NoError(t, err)
-		assert.Len(t, files, 1)
+		var names []string
+		for _, f := range files {
+			names = append(names, f.Name())
+		}
+		assert.ElementsMatch(t, []string{full, imaging.ThumbName(full)}, names)
 
-		info, err := os.Stat(filepath.Join(uploadDir, files[0].Name()))
+		info, err := os.Stat(filepath.Join(uploadDir, full))
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+	})
+
+	t.Run("large image upload writes content derivative", func(t *testing.T) {
+		handler, tmpDir := createTestComposeHandler(t, nil)
+
+		big := solidTestJPEG(t, 2000, 1200, color.RGBA{R: 30, G: 140, B: 90, A: 255})
+		req := createMultipartRequest(t, "file", "huge.jpg", big, nil)
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.POST("/compose/upload/:slug", handler.Upload)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+
+		// The markdown embeds the full-size URL; the renderer swaps in the
+		// derivative at render time, so the raw markdown stays portable.
+		full := resp["filename"].(string)
+		assert.Equal(t, "/uploads/test-article/"+full, resp["url"])
+		assert.Contains(t, resp["markdown"], "/uploads/test-article/"+full)
+
+		uploadDir := filepath.Join(tmpDir, "uploads", "test-article")
+		for _, name := range []string{full, imaging.ThumbName(full), imaging.ContentName(full)} {
+			_, err := os.Stat(filepath.Join(uploadDir, name))
+			require.NoError(t, err, "expected %s on disk", name)
+		}
+
+		// Reported dimensions are the stored full image's (capped at 2048).
+		assert.EqualValues(t, 2000, resp["width"])
+		assert.EqualValues(t, 1200, resp["height"])
+	})
+
+	t.Run("undecodable image is stored as-is", func(t *testing.T) {
+		handler, tmpDir := createTestComposeHandler(t, nil)
+
+		// minimalJPEG is a header-only fixture Go's decoder rejects: the
+		// handler must keep the bytes rather than fail the upload.
+		req := createMultipartRequest(t, "file", "broken.jpg", minimalJPEG, nil)
+		w := httptest.NewRecorder()
+
+		router := gin.New()
+		router.POST("/compose/upload/:slug", handler.Upload)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		var resp map[string]any
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		raw, err := os.ReadFile(filepath.Join(tmpDir, "uploads", "test-article", resp["filename"].(string)))
+		require.NoError(t, err)
+		assert.Equal(t, minimalJPEG, raw)
 	})
 
 	t.Run("PDF upload returns link markdown", func(t *testing.T) {
@@ -399,7 +481,7 @@ func TestUpload(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp map[string]string
+		var resp map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.NotContains(t, resp["filename"], "..")
 		assert.NotContains(t, resp["filename"], "/")
@@ -418,7 +500,7 @@ func TestUpload(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var resp map[string]string
+		var resp map[string]any
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 		assert.Contains(t, resp["markdown"], "![file]")
 	})

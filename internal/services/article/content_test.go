@@ -10,7 +10,7 @@ import (
 )
 
 func newTestProcessor() *MarkdownContentProcessor {
-	return NewMarkdownContentProcessor(slog.Default())
+	return NewMarkdownContentProcessor(slog.Default(), "")
 }
 
 func TestProcessMarkdown_Basic(t *testing.T) {

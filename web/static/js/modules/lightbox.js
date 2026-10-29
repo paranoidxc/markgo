@@ -1,5 +1,5 @@
 /**
- * Lightbox — modal viewer for gallery images.
+ * Lightbox — modal viewer for gallery images and markdown body images.
  *
  * openLightbox(images, startIndex) renders a fixed overlay with prev/next
  * navigation, a counter, and keyboard support (Esc closes, arrows navigate).
@@ -7,10 +7,20 @@
  * data-gallery-index; the container's data-full-urls attribute (JSON array,
  * rendered server-side) holds the full-size URLs including those beyond the
  * nine-grid cutoff.
+ * initContentImages() wires images embedded in a markdown body: the renderer
+ * wraps each local upload in <a class="content-image-link" href="full">, whose
+ * inline <img> is the downscaled copy. Navigation stays within the enclosing
+ * post so the feed's many cards never bleed into one another.
  */
 
 let active = null;
 let lastFocus = null;
+
+// Containers that scope one post's in-content images. The first match walking
+// up from the clicked link wins; falling back to the document keeps standalone
+// pages (about, previews) working.
+const CONTENT_IMAGE_GROUP_SELECTOR =
+    '.article-content, .feed-card-content, .thought-content, .compose-preview-content';
 
 export function openLightbox(images, startIndex) {
     closeLightbox();
@@ -108,6 +118,31 @@ export function closeLightbox() {
         active.cleanup();
         active = null;
     }
+}
+
+/**
+ * Wire click handlers on images embedded in markdown bodies. Safe to re-run
+ * after SPA content swaps — each link is initialized at most once.
+ */
+export function initContentImages() {
+    document.querySelectorAll('a.content-image-link').forEach((link) => {
+        if (link.dataset.contentImageReady) return;
+        link.dataset.contentImageReady = 'true';
+
+        link.addEventListener('click', (e) => {
+            // Modified clicks (open in new tab, save image, etc.) keep the
+            // native anchor behaviour — href is the full-size image.
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+            const group = link.closest(CONTENT_IMAGE_GROUP_SELECTOR) || document;
+            const links = Array.from(group.querySelectorAll('a.content-image-link'));
+            const urls = links.map((a) => a.href);
+            if (urls.length === 0) return;
+
+            e.preventDefault();
+            openLightbox(urls, Math.max(links.indexOf(link), 0));
+        });
+    });
 }
 
 /**

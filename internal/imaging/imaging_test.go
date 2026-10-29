@@ -243,3 +243,77 @@ func TestThumbName(t *testing.T) {
 		}
 	}
 }
+
+func TestContentName(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"1729-photo-ab12cd34.jpg", "1729-photo-ab12cd34-content.jpg"},
+		{"shot.PNG", "shot-content.png"},
+		{"anim.gif", "anim-content.jpg"}, // never written; resolver's stat misses
+		{"noext", "noext"},
+		{"weird.tar.gz", "weird.tar.gz"},
+	}
+	for _, c := range cases {
+		if got := ContentName(c.in); got != c.want {
+			t.Errorf("ContentName(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestProcess_BuildsContentDerivative(t *testing.T) {
+	src := solidJPEG(t, 3000, 1000, color.RGBA{R: 200, G: 30, B: 40, A: 255})
+	res, err := Process(src)
+	if err != nil {
+		t.Fatalf("Process: %v", err)
+	}
+	if res.ContentExt != ".jpg" {
+		t.Errorf("ContentExt = %q, want .jpg", res.ContentExt)
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(res.Content))
+	if err != nil {
+		t.Fatalf("decode content: %v", err)
+	}
+	if max(cfg.Width, cfg.Height) != ContentDimension {
+		t.Errorf("content max edge = %d, want %d", max(cfg.Width, cfg.Height), ContentDimension)
+	}
+	if cfg.Width != 1280 || cfg.Height != 426 {
+		t.Errorf("content dims = %dx%d, want 1280x426 (aspect preserved, not square)", cfg.Width, cfg.Height)
+	}
+	if len(res.Content) >= len(res.Full) {
+		t.Errorf("content derivative (%d bytes) should be smaller than full (%d bytes)",
+			len(res.Content), len(res.Full))
+	}
+}
+
+func TestProcess_ContentSkippedWhenSourceSmallEnough(t *testing.T) {
+	res, err := Process(solidJPEG(t, ContentDimension, 800, color.RGBA{B: 255, A: 255}))
+	if err != nil {
+		t.Fatalf("Process: %v", err)
+	}
+	if res.Content != nil || res.ContentExt != "" {
+		t.Errorf("expected no content derivative, got %d bytes (ext %q)", len(res.Content), res.ContentExt)
+	}
+}
+
+func TestProcess_AnimatedGIFHasNoContentDerivative(t *testing.T) {
+	pal := color.Palette{color.RGBA{R: 255, A: 255}, color.RGBA{G: 255, A: 255}}
+	g := &gif.GIF{}
+	for range 2 {
+		img := image.NewPaletted(image.Rect(0, 0, 1600, 900), pal)
+		g.Image = append(g.Image, img)
+		g.Delay = append(g.Delay, 10)
+	}
+	var buf bytes.Buffer
+	if err := gif.EncodeAll(&buf, g); err != nil {
+		t.Fatalf("encode gif: %v", err)
+	}
+
+	res, err := Process(buf.Bytes())
+	if err != nil {
+		t.Fatalf("Process: %v", err)
+	}
+	// Re-encoding frame 0 would silently kill the animation — the body keeps
+	// the animated original instead.
+	if res.Content != nil {
+		t.Errorf("animated GIF should not get a content derivative, got %d bytes", len(res.Content))
+	}
+}

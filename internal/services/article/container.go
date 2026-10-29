@@ -82,7 +82,7 @@ func (c *ServiceContainer) initializeServices() {
 	}
 
 	// 4. Initialize content processor
-	c.contentProcessor = NewMarkdownContentProcessor(c.logger)
+	c.contentProcessor = NewMarkdownContentProcessor(c.logger, c.config.UploadPath)
 
 	// 5. Initialize search service
 	c.searchService = NewTextSearchService(c.logger)

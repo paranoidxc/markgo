@@ -300,7 +300,7 @@ func setupServer(cfg *config.Config, logger *slog.Logger) (*gin.Engine, *service
 	feedService := feed.NewService(articleService, cfg)
 
 	// Initialize markdown renderer for compose preview
-	markdownRenderer := article.NewMarkdownContentProcessor(logger)
+	markdownRenderer := article.NewMarkdownContentProcessor(logger, cfg.Upload.Path)
 
 	// Initialize session store for admin authentication
 	sessionStore := middleware.NewSessionStore()

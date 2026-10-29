@@ -59,6 +59,47 @@
     background: rgba(0, 0, 0, 0.55);
 }
 
+/* ── In-content images (markdown body) ─────────────────────────────────── */
+
+/* The markdown renderer wraps every local upload in this link. The inline
+   <img> is the downscaled derivative; the href is the full-size file the
+   lightbox opens as a modal. Without JS the link degrades to "view full size". */
+.content-image-link {
+    display: block;
+    max-width: 100%;
+    margin: var(--spacing-6) 0;
+    border-radius: var(--radius-lg);
+    cursor: zoom-in;
+}
+
+.content-image-link:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+}
+
+.content-image-link > img.content-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+    border-radius: var(--radius-lg);
+    transition: opacity 0.15s ease;
+}
+
+.content-image-link:hover > img.content-image {
+    opacity: 0.92;
+}
+
+/* Feed cards keep in-content images bounded so one tall screenshot can't
+   swallow the stream. width:auto preserves the aspect ratio (nothing is
+   cropped); the lightbox still shows the full frame. */
+.feed-card-body .content-image-link > img.content-image {
+    width: auto;
+    max-width: 100%;
+    max-height: 420px;
+    margin-inline: 0;
+}
+
 /* ── Lightbox ──────────────────────────────────────────────────────────── */
 
 .lightbox-overlay {

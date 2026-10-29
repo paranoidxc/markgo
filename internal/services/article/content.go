@@ -11,6 +11,9 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/util"
+
+	"github.com/1mb-dev/markgo/internal/imaging"
 )
 
 // ContentProcessor handles all content-related processing operations
@@ -34,6 +37,10 @@ type MarkdownContentProcessor struct {
 	markdown goldmark.Markdown
 	logger   *slog.Logger
 
+	// resolver maps upload URLs to their inline content derivatives. Nil when
+	// the processor was built without an uploads directory.
+	resolver *imaging.Resolver
+
 	// Pre-compiled regexes for performance
 	codeBlockRe      *regexp.Regexp
 	linkRe           *regexp.Regexp
@@ -41,8 +48,13 @@ type MarkdownContentProcessor struct {
 	duplicateTitleRe *regexp.Regexp
 }
 
-// NewMarkdownContentProcessor creates a new markdown content processor
-func NewMarkdownContentProcessor(logger *slog.Logger) *MarkdownContentProcessor {
+// NewMarkdownContentProcessor creates a new markdown content processor.
+// uploadRoot is the directory uploads are stored in; it is used to find the
+// downscaled derivative of images embedded in markdown bodies, so pass the
+// configured upload path. An empty uploadRoot disables that rewriting.
+func NewMarkdownContentProcessor(logger *slog.Logger, uploadRoot string) *MarkdownContentProcessor {
+	resolver := imaging.NewResolver(uploadRoot)
+
 	// Configure Goldmark with extensions
 	md := goldmark.New(
 		goldmark.WithExtensions(
@@ -55,6 +67,9 @@ func NewMarkdownContentProcessor(logger *slog.Logger) *MarkdownContentProcessor 
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(), // Auto-generate heading IDs
+			parser.WithASTTransformers(
+				util.Prioritized(&contentImageTransformer{resolver: resolver}, 100),
+			),
 		),
 		goldmark.WithRendererOptions(
 			html.WithHardWraps(), // Hard line breaks
@@ -66,6 +81,7 @@ func NewMarkdownContentProcessor(logger *slog.Logger) *MarkdownContentProcessor 
 	return &MarkdownContentProcessor{
 		markdown: md,
 		logger:   logger,
+		resolver: resolver,
 
 		// Pre-compile regexes for performance
 		codeBlockRe:      regexp.MustCompile("```[\\s\\S]*?```"),

@@ -26,7 +26,6 @@ import (
 	"github.com/1mb-dev/goflow/pkg/scheduling/workerpool"
 	"github.com/1mb-dev/obcache-go/v2/pkg/obcache"
 	"github.com/dustin/go-humanize"
-	"github.com/microcosm-cc/bluemonday"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
@@ -511,10 +510,10 @@ func GetTemplateFuncMap() template.FuncMap {
 var templateFuncs = template.FuncMap{
 	"safeHTML": func(s string) template.HTML {
 		s = html.UnescapeString(s)
-		// Basic sanitization using bluemonday UGC policy
-		policy := bluemonday.UGCPolicy()
+		// Sanitize with the shared content policy so inline images keep their
+		// lightbox wrapper and lazy-loading hints (see ContentHTMLPolicy).
 		// #nosec G203 - This is intentional HTML output for templates, sanitized by bluemonday
-		return template.HTML(policy.Sanitize(s))
+		return template.HTML(ContentHTMLPolicy().Sanitize(s))
 	},
 	"join": func(sep string, items []string) string {
 		return strings.Join(items, sep)

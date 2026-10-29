@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/microcosm-cc/bluemonday"
 
 	apperrors "github.com/1mb-dev/markgo/internal/errors"
 	"github.com/1mb-dev/markgo/internal/models"
@@ -417,7 +416,9 @@ func (h *ComposeHandler) Preview(c *gin.Context) {
 		return
 	}
 
-	safeHTML := bluemonday.UGCPolicy().Sanitize(html)
+	// Same policy the published page uses for its body HTML, so the preview
+	// shows exactly what will be rendered.
+	safeHTML := services.ContentHTMLPolicy().Sanitize(html)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(safeHTML))
 }
 
