@@ -84,6 +84,113 @@ func TestOrphanSweep_GalleryImagesAndThumbsProtected(t *testing.T) {
 	assert.True(t, os.IsNotExist(err), "unreferenced file should be swept")
 }
 
+func TestOrphanSweep_PreservesReferencedImageCompanions(t *testing.T) {
+	references := []struct {
+		name    string
+		article func(string) *models.Article
+	}{
+		{
+			name: "gallery URL",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Images: []string{"/uploads/post/" + filename}}
+			},
+		},
+		{
+			name: "gallery bare filename",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Images: []string{filename}}
+			},
+		},
+		{
+			name: "banner URL",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Banner: "/uploads/post/" + filename}
+			},
+		},
+		{
+			name: "banner bare filename",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Banner: filename}
+			},
+		},
+		{
+			name: "markdown image",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Content: "![photo](/uploads/post/" + filename + ")"}
+			},
+		},
+		{
+			name: "HTML image with query and fragment",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Content: `<img src="/uploads/post/` + filename + `?v=2#photo">`}
+			},
+		},
+		{
+			name: "cross-slug reference",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "other-post", Content: "![photo](/uploads/post/" + filename + ")"}
+			},
+		},
+		{
+			name: "URL-encoded reference",
+			article: func(filename string) *models.Article {
+				return &models.Article{Slug: "post", Content: "![photo](/uploads/post/%70" + filename[1:] + ")"}
+			},
+		},
+	}
+	formats := []struct {
+		filename string
+		thumb    string
+		content  string
+	}{
+		{filename: "photo.jpg", thumb: "photo-thumb.jpg", content: "photo-content.jpg"},
+		{filename: "photo.png", thumb: "photo-thumb.png", content: "photo-content.png"},
+		{filename: "photo.gif", thumb: "photo-thumb.jpg"},
+		{filename: "photo.jpeg", thumb: "photo-thumb.jpg", content: "photo-content.jpg"},
+		{filename: "photo.webp", thumb: "photo-thumb.jpg"},
+		{filename: "photo.JPG", thumb: "photo-thumb.jpg", content: "photo-content.jpg"},
+	}
+	for _, reference := range references {
+		for _, format := range formats {
+			t.Run(reference.name+"/"+format.filename, func(t *testing.T) {
+				uploadDir := t.TempDir()
+				kept := []string{
+					stageOrphanFile(t, uploadDir, "post", format.filename),
+					stageOrphanFile(t, uploadDir, "post", format.thumb),
+				}
+				if format.content != "" {
+					kept = append(kept, stageOrphanFile(t, uploadDir, "post", format.content))
+				}
+				orphaned := []string{
+					stageOrphanFile(t, uploadDir, "post", "unused.jpg"),
+					stageOrphanFile(t, uploadDir, "post", "unused-thumb.jpg"),
+					stageOrphanFile(t, uploadDir, "post", "unused-content.jpg"),
+				}
+				articles := []*models.Article{reference.article(format.filename)}
+
+				cleaned, errs := OrphanSweep(context.Background(), articles, uploadDir, quietSweepLogger())
+
+				assert.Empty(t, errs)
+				assert.Equal(t, len(orphaned), cleaned)
+				for _, path := range kept {
+					assert.FileExists(t, path)
+				}
+				for _, path := range orphaned {
+					assert.NoFileExists(t, path)
+				}
+
+				cleaned, errs = OrphanSweep(context.Background(), articles, uploadDir, quietSweepLogger())
+
+				assert.Empty(t, errs)
+				assert.Zero(t, cleaned, "repeated startup sweeps must preserve referenced image companions")
+				for _, path := range kept {
+					assert.FileExists(t, path)
+				}
+			})
+		}
+	}
+}
+
 func TestOrphanSweep_MusicProtected(t *testing.T) {
 	uploadDir := t.TempDir()
 	slug := "song-post"

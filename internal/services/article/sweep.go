@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/1mb-dev/markgo/internal/imaging"
 	"github.com/1mb-dev/markgo/internal/models"
 )
 
@@ -102,9 +103,6 @@ func addImageRefs(refs map[string]struct{}, a *models.Article, absBase string) {
 			continue
 		}
 		addRefFromRel(refs, rel, absBase)
-		if thumb := thumbRelativePath(rel); thumb != "" {
-			addRefFromRel(refs, thumb, absBase)
-		}
 	}
 }
 
@@ -112,7 +110,7 @@ func addImageRefs(refs map[string]struct{}, a *models.Article, absBase string) {
 // companion thumbnail path, or "" when the extension has no thumbnail form.
 func thumbRelativePath(rel string) string {
 	ext := strings.ToLower(filepath.Ext(rel))
-	base := strings.TrimSuffix(rel, ext)
+	base := rel[:len(rel)-len(ext)]
 	switch ext {
 	case ".png":
 		return base + "-thumb.png"
@@ -147,7 +145,8 @@ func addBodyRefs(refs map[string]struct{}, content, absBase string) {
 }
 
 // addRefFromRel resolves a "<slug>/<filename>" path against absBase,
-// URL-decodes it, rejects traversal, and records the result.
+// URL-decodes it, rejects traversal, and records the result along with any
+// companion image thumbnail and content derivative.
 func addRefFromRel(refs map[string]struct{}, rel, absBase string) {
 	if decoded, err := url.PathUnescape(rel); err == nil {
 		rel = decoded
@@ -163,6 +162,10 @@ func addRefFromRel(refs map[string]struct{}, rel, absBase string) {
 		return
 	}
 	refs[abs] = struct{}{}
+	if thumb := thumbRelativePath(abs); thumb != "" {
+		refs[thumb] = struct{}{}
+	}
+	refs[imaging.ContentName(abs)] = struct{}{}
 }
 
 // sweepUnreferenced walks absBase's slug subdirectories and removes any
