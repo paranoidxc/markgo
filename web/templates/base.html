@@ -170,6 +170,7 @@
     <link rel="stylesheet" href="/static/css/search.css">
     <link rel="stylesheet" href="/static/css/about.css">
     <link rel="stylesheet" href="/static/css/taxonomy.css">
+    <link rel="stylesheet" href="/static/css/goal.css">
     <link rel="stylesheet" href="/static/css/compose.css">
     <link rel="stylesheet" href="/static/css/admin.css">
     <link rel="stylesheet" href="/static/css/admin-ama.css">
@@ -197,6 +198,7 @@
     {{ if eq $tpl "categories" }}{{ template "categories-head" . }}{{ end }}
     {{ if eq $tpl "tag" }}{{ template "tag-head" . }}{{ end }}
     {{ if eq $tpl "category" }}{{ template "category-head" . }}{{ end }}
+    {{ if eq $tpl "goal" }}{{ template "goal-head" . }}{{ end }}
     {{ if eq $tpl "admin_home" }}{{ template "admin_home-head" . }}{{ end }}
     {{ if eq $tpl "drafts" }}{{ template "drafts-head" . }}{{ end }}
     {{ if eq $tpl "admin_writing" }}{{ template "admin_writing-head" . }}{{ end }}
@@ -215,6 +217,7 @@
     {{- else if eq $tpl "categories" -}}categories-page
     {{- else if eq $tpl "tag" -}}tag-page
     {{- else if eq $tpl "category" -}}category-page
+    {{- else if eq $tpl "goal" -}}goal-page
     {{- else if eq $tpl "feed" -}}feed-page
     {{- else if eq $tpl "compose" -}}compose-page
     {{- else if eq $tpl "admin_home" -}}admin-page
@@ -414,6 +417,7 @@
         {{ if eq $tpl "about" }}{{ template "about-content" . }}{{ end }}
         {{ if eq $tpl "tags" }}{{ template "tags-content" . }}{{ end }}
         {{ if eq $tpl "tag" }}{{ template "tag-content" . }}{{ end }}
+        {{ if eq $tpl "goal" }}{{ template "goal-content" . }}{{ end }}
         {{ if eq $tpl "categories" }}{{ template "categories-content" . }}{{ end }}
         {{ if eq $tpl "category" }}{{ template "category-content" . }}{{ end }}
         {{ if eq $tpl "admin_home" }}{{ template "admin_home-content" . }}{{ end }}

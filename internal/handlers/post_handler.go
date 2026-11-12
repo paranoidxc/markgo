@@ -68,6 +68,52 @@ func (h *PostHandler) Articles(c *gin.Context) {
 	h.renderHTML(c, http.StatusOK, "base.html", data)
 }
 
+// Goal handles the /goal listing page: every published post that carries a
+// positive amount, date-descending like the feed, paginated like /writing.
+// Drafts never contribute — the page mirrors what the home-page goal bar
+// counts. A zero BLOG_GOAL_TOTAL still renders the list (clicking through
+// from an unconfigured bar is impossible, but the URL remains reachable).
+func (h *PostHandler) Goal(c *gin.Context) {
+	pageStr := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	allArticles := h.articleService.GetAllArticles()
+
+	var withAmount []*models.Article
+	var amountSum float64
+	for _, a := range allArticles {
+		if a.Draft || a.Amount <= 0 {
+			continue
+		}
+		withAmount = append(withAmount, a)
+		amountSum += a.Amount
+	}
+
+	postsPerPage := h.config.Blog.PostsPerPage
+	if postsPerPage <= 0 {
+		postsPerPage = 10
+	}
+
+	pagination := models.NewPagination(page, len(withAmount), postsPerPage)
+
+	start := (pagination.CurrentPage - 1) * postsPerPage
+	end := min(start+postsPerPage, len(withAmount))
+
+	data := h.buildBaseTemplateData("无敌之日 - " + h.config.Blog.Title)
+	data["description"] = "无敌之日 (goal) progress from " + h.config.Blog.Title
+	data["articles"] = withAmount[start:end]
+	data["pagination"] = pagination
+	data["goal"] = models.NewGoalProgress(amountSum, h.config.Blog.GoalTotal)
+	data["template"] = "goal"
+	data["canonicalPath"] = "/goal"
+
+	h.enhanceTemplateDataWithSEO(data, c.Request.URL.Path)
+	h.renderHTML(c, http.StatusOK, "base.html", data)
+}
+
 // Article handles individual article requests.
 func (h *PostHandler) Article(c *gin.Context) {
 	slug := c.Param("slug")
@@ -196,9 +242,11 @@ func (h *PostHandler) getArticlesPage(page int) (map[string]any, error) {
 	allArticles := h.articleService.GetAllArticles()
 
 	var published []*models.Article
+	var amountSum float64
 	for _, article := range allArticles {
 		if !article.Draft {
 			published = append(published, article)
+			amountSum += article.Amount
 		}
 	}
 
@@ -223,6 +271,7 @@ func (h *PostHandler) getArticlesPage(page int) (map[string]any, error) {
 	data["pagination"] = pagination
 	data["template"] = "articles"
 	data["canonicalPath"] = "/writing"
+	data["goal"] = models.NewGoalProgress(amountSum, h.config.Blog.GoalTotal)
 
 	if baseURL := h.config.BaseURL; baseURL != "" {
 		items := make([]map[string]any, len(articles))

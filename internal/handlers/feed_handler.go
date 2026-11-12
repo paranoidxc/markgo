@@ -134,9 +134,14 @@ func (h *FeedHandler) getHomeData(page int, typeFilter string) (map[string]any, 
 		postsPerPage = 20
 	}
 	var posts []*models.Article
+	var amountSum float64
 	for _, a := range allArticles {
-		if !a.Draft && (typeFilter == "" || a.Type == typeFilter) {
-			posts = append(posts, a)
+		if !a.Draft {
+			// Goal sum spans every published post, not just the filtered view.
+			amountSum += a.Amount
+			if typeFilter == "" || a.Type == typeFilter {
+				posts = append(posts, a)
+			}
 		}
 	}
 
@@ -153,6 +158,7 @@ func (h *FeedHandler) getHomeData(page int, typeFilter string) (map[string]any, 
 	data["activeFilter"] = typeFilter
 	data["template"] = "feed"
 	data["canonicalPath"] = "/"
+	data["goal"] = models.NewGoalProgress(amountSum, h.config.Blog.GoalTotal)
 
 	return data, nil
 }

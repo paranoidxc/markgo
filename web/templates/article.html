@@ -2,6 +2,11 @@
 <div class="page-container">
     <article class="article-detail">
         <div class="container">
+            {{ if not (le .article.Amount 0.0) }}
+            <div class="article-amount-row">
+                <span class="article-amount" title="Amount ¥{{ printf "%.2f" .article.Amount }}">¥{{ printf "%.2f" .article.Amount }}</span>
+            </div>
+            {{ end }}
             {{ if eq .article.Type "thought" }}
             <!-- Thought detail -->
             <header class="article-header article-header-thought">

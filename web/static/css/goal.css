@@ -1,0 +1,252 @@
+/* ==========================================================================
+   Goal Bar Styles
+   无敌之日 progress bar: home-page feed header, /writing title row, and
+   the /goal listing page.
+   Two stacked colors: the full-width track is a light theme-color total,
+   the fill carries the primary-color current sum on top. The numbers live
+   in the custom tooltip only — no visible label.
+   The home-page and /writing instances are <a href="/goal"> (click to see
+   the amount list); the /goal page renders a non-interactive static one.
+   ========================================================================== */
+
+.goal-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-2) 0;
+    text-decoration: none;
+    border-radius: 999px;
+}
+
+.goal-bar:hover {
+    text-decoration: none;
+}
+
+.goal-bar:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 4px;
+}
+
+.goal-bar-track {
+    display: block;
+    flex: 1;
+    width: 100%;
+    height: 0.5rem;
+    border-radius: 999px;
+    /* Total layer: theme primary mixed against the page background so it
+       stays visibly light in both light and dark themes. Fallback
+       --color-bg-tertiary for browsers without color-mix. */
+    background: var(--color-bg-tertiary);
+    background: color-mix(in srgb, var(--color-primary) 22%, var(--color-bg-primary));
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.goal-bar-fill {
+    /* Current-sum layer: the theme primary color stacked on the tint */
+    fill: var(--color-primary);
+    transition: width var(--transition-base, 200ms ease);
+}
+
+.goal-tooltip {
+    position: absolute;
+    top: calc(100% + 0.75rem);
+    right: 0;
+    z-index: var(--z-tooltip);
+    width: min(18rem, calc(100vw - 2rem));
+    box-sizing: border-box;
+    padding: var(--spacing-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.06);
+    font-size: var(--font-size-sm);
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+    cursor: default;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 160ms ease, transform 160ms ease, visibility 160ms ease;
+}
+
+.goal-tooltip::before {
+    content: "";
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    height: 1rem;
+}
+
+.goal-tooltip::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: 1.25rem;
+    width: 10px;
+    height: 10px;
+    border-top: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+    background: var(--color-bg-primary);
+    transform: rotate(45deg);
+}
+
+.goal-bar:is(:hover, :focus-within):not([data-tooltip-dismissed]) .goal-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.goal-tooltip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3);
+    padding-bottom: var(--spacing-3);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.goal-tooltip-title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-2);
+    font-weight: 600;
+}
+
+.goal-tooltip-title::before {
+    content: "";
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+}
+
+.goal-tooltip-percent {
+    padding: 0.125rem var(--spacing-2);
+    border-radius: var(--radius-full);
+    background: var(--color-bg-tertiary);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-primary));
+    color: var(--color-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.goal-tooltip-amounts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--spacing-4);
+    padding-top: var(--spacing-3);
+}
+
+.goal-tooltip-stat {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-1);
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+.goal-tooltip-stat strong {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+}
+
+.goal-tooltip-label {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.goal-tooltip-current {
+    color: var(--color-primary);
+}
+
+.feed-header .goal-tooltip {
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -4px);
+}
+
+.feed-header .goal-tooltip::after {
+    right: auto;
+    left: calc(50% - 5px);
+}
+
+.feed-header .goal-bar:is(:hover, :focus-within):not([data-tooltip-dismissed]) .goal-tooltip {
+    transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .goal-tooltip {
+        transition: none;
+    }
+}
+
+/* Feed header: spans the compose/card column width */
+.feed-header .goal-bar {
+    display: flex;
+    width: 100%;
+    max-width: var(--max-content-width);
+    margin: var(--spacing-4) auto 0;
+}
+
+/* Title rows (/writing, /goal): bar flexes to fill the space right of
+   the title. flex-wrap on the row lets it fall below the title on narrow
+   viewports. */
+.articles-header-row {
+    display: flex;
+    flex-wrap: wrap; /* narrow viewports: bar wraps below the title */
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-3) var(--spacing-4);
+}
+
+/* page-title's default bottom margin would push the bar off the baseline */
+.articles-header-row .page-title {
+    margin-bottom: 0;
+}
+
+.articles-header-row .goal-bar {
+    flex: 1;
+    margin: 0;
+    min-width: 6rem;
+}
+
+/* /goal page: non-interactive variant, same title-row sizing */
+.goal-bar-static {
+    cursor: default;
+}
+
+/* Corner badge on each card on /goal */
+.goal-item {
+    position: relative;
+}
+
+.goal-item-amount {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    z-index: 1;
+}
+
+.goal-item-amount,
+.article-amount {
+    padding: var(--spacing-1) var(--spacing-3);
+    border-radius: 999px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-bg-tertiary);
+    background: color-mix(in srgb, var(--color-primary) 12%, var(--color-bg-primary));
+    border: 1px solid var(--color-border);
+    border-color: color-mix(in srgb, var(--color-primary) 25%, var(--color-bg-primary));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.article-amount-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: var(--spacing-3);
+}

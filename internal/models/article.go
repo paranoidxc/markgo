@@ -3,6 +3,7 @@
 package models
 
 import (
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -42,6 +43,10 @@ type Article struct {
 	// /uploads/<slug>/<file> URL) uploaded via the compose page's music
 	// area. One track per article; a new upload replaces the old one.
 	Music        string    `yaml:"music,omitempty" json:"music,omitempty"`
+	// Amount holds an optional numeric value (amount) attached to the post
+	// via the compose form. Aggregated into the goal progress bar on the
+	// home page when BLOG_GOAL_TOTAL is configured.
+	Amount       float64   `yaml:"amount,omitempty" json:"amount,omitempty"`
 	Content      string    `yaml:"-" json:"content"`
 	ReadingTime  int       `yaml:"-" json:"reading_time"`
 	WordCount    int       `yaml:"-" json:"word_count"`
@@ -307,6 +312,42 @@ type Stats struct {
 	PopularTags     []TagCount     `json:"popular_tags"`
 	RecentArticles  []*ArticleList `json:"recent_articles"`
 	LastUpdated     time.Time      `json:"last_updated"`
+}
+
+// GoalProgress carries the home-page goal bar's render state: the sum of
+// every published post's Amount against the operator-configured goal total
+// (BLOG_GOAL_TOTAL). Show is false when no total is configured — templates
+// hide the bar then. A configured total with a zero sum still shows an
+// empty bar (honest "¥0.00 / ¥total"). Percent is clamped to [0, 100] so
+// an exceeded goal renders a full bar while the tooltip keeps the real
+// numbers.
+type GoalProgress struct {
+	Sum     float64 `json:"sum"`
+	Total   float64 `json:"total"`
+	Percent float64 `json:"percent"`
+	Show    bool    `json:"show"`
+}
+
+// NewGoalProgress computes GoalProgress for a sum and configured total.
+// percent is rounded to two decimals to keep template style attributes
+// clean (width: 33.33%).
+func NewGoalProgress(sum, total float64) *GoalProgress {
+	if total <= 0 {
+		return &GoalProgress{Sum: sum, Total: total}
+	}
+	p := sum / total * 100
+	if p < 0 {
+		p = 0
+	}
+	if p > 100 {
+		p = 100
+	}
+	return &GoalProgress{
+		Sum:     sum,
+		Total:   total,
+		Percent: math.Round(p*100) / 100,
+		Show:    true,
+	}
 }
 
 // TagCount represents tag usage statistics

@@ -9,6 +9,11 @@
             {{ else if .config.Blog.Description }}
             <p class="feed-tagline">{{ .config.Blog.Description }}</p>
             {{ end }}
+            {{ if .goal.Show }}
+            <a class="goal-bar" href="/goal" aria-label="查看无敌之日目标明细" aria-describedby="goal-progress-tooltip">
+                {{ template "goal-progress" .goal }}
+            </a>
+            {{ end }}
         </header>
 
         <!-- Feed Type Filters -->

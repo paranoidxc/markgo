@@ -518,6 +518,7 @@ func setupRoutes(router *gin.Engine, h *handlers.Router, sessionStore *middlewar
 	registerGET(router, "/ama", h.Feed.Type)
 	registerGET(router, "/writing", h.Post.Articles)
 	registerGET(router, "/writing/:slug", h.Post.Article)
+	registerGET(router, "/goal", h.Post.Goal)
 	registerGET(router, "/p", h.Post.Pages)
 	registerGET(router, "/p/:slug", h.Post.Page)
 	registerGET(router, "/tags", h.Taxonomy.Tags)

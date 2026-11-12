@@ -3,8 +3,10 @@ package compose
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +53,10 @@ type Input struct {
 	// Music is the article's single audio track, validated like Images
 	// (see ParseMusicInput) and stored in frontmatter as `music`.
 	Music      string   `json:"music"`
+	// Amount is an optional numeric value (amount) for the post, kept as
+	// the raw form/JSON string and parsed via ParseAmount. Stored in
+	// frontmatter as `amount` when positive.
+	Amount     string   `json:"amount"`
 	Draft      bool     `json:"draft"`
 	Asker      string   `json:"asker"`
 	AskerEmail string   `json:"asker_email"`
@@ -62,6 +68,21 @@ type Input struct {
 	// pages need stable, hand-picked URLs. Ignored otherwise — other
 	// types derive slugs from title or timestamp.
 	Slug string `json:"slug"`
+}
+
+// ParseAmount validates a compose amount input string and returns its value.
+// Empty (unset) is valid and yields 0; anything non-numeric, negative, or
+// non-finite is rejected. Callers treat <= 0 as "no amount".
+func ParseAmount(raw string) (float64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+		return 0, fmt.Errorf("invalid amount %q: must be a non-negative number", raw)
+	}
+	return v, nil
 }
 
 // CreatePost creates a new markdown post file from compose input.
@@ -144,6 +165,11 @@ func (s *Service) CreatePost(input *Input) (string, error) {
 	}
 	if input.Music != "" {
 		fm["music"] = input.Music
+	}
+	if amount, err := ParseAmount(input.Amount); err != nil {
+		return "", fmt.Errorf("%w: %w", apperrors.ErrValidation, err)
+	} else if amount > 0 {
+		fm["amount"] = amount
 	}
 	setIfNonEmpty(fm, "author", s.defaultAuthor)
 	setIfNonEmpty(fm, "type", input.Type)
@@ -246,6 +272,10 @@ func (s *Service) LoadArticle(slug string) (*Input, error) {
 	if music, ok := fm["music"].(string); ok {
 		input.Music = music
 	}
+	if amount, ok := fm["amount"].(float64); ok {
+		// -1 precision keeps the shortest round-trip form: 12.5 not 12.50000
+		input.Amount = strconv.FormatFloat(amount, 'f', -1, 64)
+	}
 	if draft, ok := fm["draft"].(bool); ok {
 		input.Draft = draft
 	}
@@ -346,6 +376,16 @@ func (s *Service) UpdateArticle(slug string, input *Input) (prevBanner string, e
 		fm["music"] = input.Music
 	} else {
 		delete(fm, "music")
+	}
+
+	// Amount: set-or-delete. Parse first so a bad edit fails loudly instead
+	// of silently dropping the value.
+	if amount, err := ParseAmount(input.Amount); err != nil {
+		return "", fmt.Errorf("%w: %w", apperrors.ErrValidation, err)
+	} else if amount > 0 {
+		fm["amount"] = amount
+	} else {
+		delete(fm, "amount")
 	}
 
 	fm["draft"] = input.Draft

@@ -217,11 +217,33 @@ func (h *ComposeHandler) HandleEdit(c *gin.Context) {
 		Categories:  c.PostForm("categories"),
 		Banner:      c.PostForm("banner"),
 		BannerAlt:   c.PostForm("banner_alt"),
+		Amount:      c.PostForm("amount"),
 		Draft:       c.PostForm("draft") == "on",
 		Type:        c.PostForm("type"),
 	}
 	input.Images = compose.ParseImagesInput(c.PostForm("images"), slug)
 	input.Music = compose.ParseMusicInput(c.PostForm("music"), slug)
+
+	// Validate amount before anything else so a typo re-renders the form
+	// with the operator's input intact instead of failing at the service.
+	if _, err := compose.ParseAmount(input.Amount); err != nil {
+		data := h.buildBaseTemplateData("Edit - " + h.config.Blog.Title)
+		data["template"] = templateCompose
+		data["error"] = err.Error()
+		data["input"] = input
+		data["editing"] = true
+		data["slug"] = slug
+		data["canonicalPath"] = h.canonicalPathForSlug(slug)
+		if input.Type == articlepkg.TypePage {
+			data["mode"] = articlepkg.TypePage
+		}
+		data["csrf_token"] = refreshCSRFToken(c)
+		if c.IsAborted() {
+			return
+		}
+		h.renderHTML(c, http.StatusBadRequest, "base.html", data)
+		return
+	}
 
 	if input.Content == "" {
 		data := h.buildBaseTemplateData("Edit - " + h.config.Blog.Title)
@@ -308,12 +330,31 @@ func (h *ComposeHandler) HandleSubmit(c *gin.Context) {
 		Categories:  c.PostForm("categories"),
 		Banner:      c.PostForm("banner"),
 		BannerAlt:   c.PostForm("banner_alt"),
+		Amount:      c.PostForm("amount"),
 		Draft:       c.PostForm("draft") == "on",
 		Type:        c.PostForm("type"),
 		Slug:        c.PostForm("slug"),
 	}
 	input.Images = compose.ParseImagesInput(c.PostForm("images"), c.PostForm("slug"))
 	input.Music = compose.ParseMusicInput(c.PostForm("music"), c.PostForm("slug"))
+
+	// Validate amount before anything else so a typo re-renders the form
+	// with the operator's input intact instead of failing at the service.
+	if _, err := compose.ParseAmount(input.Amount); err != nil {
+		data := h.buildBaseTemplateData("Compose - " + h.config.Blog.Title)
+		data["template"] = templateCompose
+		data["error"] = err.Error()
+		data["input"] = input
+		if input.Type == articlepkg.TypePage {
+			data["mode"] = articlepkg.TypePage
+		}
+		data["csrf_token"] = refreshCSRFToken(c)
+		if c.IsAborted() {
+			return
+		}
+		h.renderHTML(c, http.StatusBadRequest, "base.html", data)
+		return
+	}
 
 	if input.Content == "" {
 		data := h.buildBaseTemplateData("Compose - " + h.config.Blog.Title)

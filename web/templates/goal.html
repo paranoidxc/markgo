@@ -1,0 +1,82 @@
+{{ define "goal-content" }}
+<div class="goal-page">
+    <div class="container">
+        <header class="page-header">
+            <div class="articles-header-row">
+                <h1 class="page-title">无敌之日</h1>
+                {{ if .goal.Show }}
+                <div class="goal-bar goal-bar-static" tabindex="0" role="group" aria-label="无敌之日目标进度" aria-describedby="goal-progress-tooltip">
+                    {{ template "goal-progress" .goal }}
+                </div>
+                {{ end }}
+            </div>
+            {{ if .goal.Show }}
+            <p class="page-subtitle">¥{{ printf "%.2f" .goal.Sum }} / ¥{{ printf "%.2f" .goal.Total }} · {{ printf "%.0f" .goal.Percent }}%</p>
+            {{ else }}
+            <p class="page-subtitle">{{ .pagination.TotalItems }} {{ if eq .pagination.TotalItems 1 }}post{{ else }}posts{{ end }} with amounts</p>
+            {{ end }}
+        </header>
+
+        {{ if .articles }}
+        <section class="content-stream goal-stream" aria-label="Posts with amounts">
+            {{ range .articles }}
+            <div class="goal-item">
+                {{ template "card-by-type" . }}
+                <span class="goal-item-amount" title="Amount ¥{{ printf "%.2f" .Amount }}">¥{{ printf "%.2f" .Amount }}</span>
+            </div>
+            {{ end }}
+        </section>
+
+        {{ if or .pagination.HasPrevious .pagination.HasNext }}
+        <nav class="simple-pagination" aria-label="Goal posts pagination">
+            {{ if .pagination.HasPrevious }}
+            <a href="/goal?page={{ .pagination.PreviousPage }}" class="simple-pagination-link">← Newer</a>
+            {{ end }}
+            <span class="pagination-info">Page {{ .pagination.CurrentPage }} of {{ .pagination.TotalPages }}</span>
+            {{ if .pagination.HasNext }}
+            <a href="/goal?page={{ .pagination.NextPage }}" class="simple-pagination-link">Older →</a>
+            {{ end }}
+        </nav>
+        {{ end }}
+
+        {{ else }}
+        <div class="empty-state">
+            <h2>No amount-tracked posts yet</h2>
+            <p>Posts composed with an amount will appear here and count toward the goal.</p>
+        </div>
+        {{ end }}
+
+        <nav class="page-back-link-container">
+            <a href="/" class="page-back-link">← Home</a>
+        </nav>
+    </div>
+</div>
+{{ end }}
+
+{{ define "goal-head" }}
+{{ if not .config.SEO.Enabled }}
+<meta name="description" content="无敌之日 goal progress from {{ .config.Blog.Title }}.">
+{{ end }}
+{{ end }}
+
+{{ define "goal-progress" }}
+<svg class="goal-bar-track" role="progressbar" aria-label="无敌之日" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ .Percent }}">
+    <rect class="goal-bar-fill" width="{{ .Percent }}%" height="100%" rx="4" />
+</svg>
+<span class="goal-tooltip" id="goal-progress-tooltip" role="tooltip">
+    <span class="goal-tooltip-header">
+        <span class="goal-tooltip-title">无敌之日</span>
+        <span class="goal-tooltip-percent">{{ printf "%g" .Percent }}%</span>
+    </span>
+    <span class="goal-tooltip-amounts">
+        <span class="goal-tooltip-stat">
+            <span class="goal-tooltip-label">已累计</span>
+            <strong class="goal-tooltip-current">¥{{ printf "%.2f" .Sum }}</strong>
+        </span>
+        <span class="goal-tooltip-stat">
+            <span class="goal-tooltip-label">目标金额</span>
+            <strong>¥{{ printf "%.2f" .Total }}</strong>
+        </span>
+    </span>
+</span>
+{{ end }}

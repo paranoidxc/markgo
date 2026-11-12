@@ -58,6 +58,7 @@ Everything else has sensible defaults for development.
 | `BLOG_THEME` | `default` | Color theme name. |
 | `BLOG_STYLE` | `minimal` | CSS style theme: `minimal`, `editorial`, or `bold`. |
 | `BLOG_POSTS_PER_PAGE` | `10` | Items per page in listings (1-100). |
+| `BLOG_GOAL_TOTAL` | `0` | Total for the home-page goal progress bar (无敌之日). Posts composed with an amount are summed against it; `0` hides the bar. Clicking the bar opens `/goal`, a paginated list of amount-bearing posts. |
 
 ## About Page
 

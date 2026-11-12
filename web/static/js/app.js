@@ -22,6 +22,7 @@ import { init as initComposeSheet } from './modules/compose-sheet.js';
 import { init as initAMASheet } from './modules/ama-sheet.js';
 import { init as initSearchPopover } from './modules/search-popover.js';
 import { init as initSubscribePopover } from './modules/subscribe-popover.js';
+import { init as initGoalTooltip } from './modules/goal-tooltip.js';
 import { init as initRouter } from './modules/router.js';
 
 // One-shot migration: any markgo:* localStorage key not under current NS gets
@@ -216,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAMASheet();
     initSearchPopover();
     initSubscribePopover();
+    initGoalTooltip();
 
     // Content modules — initial page
     initHighlight();

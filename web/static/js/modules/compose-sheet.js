@@ -20,6 +20,7 @@ let initialized = false;
 let overlay = null;
 let textarea = null;
 let titleInput = null;
+let amountInput = null;
 let saveDraftBtn = null;
 let publishLink = null;
 let draftNotice = null;
@@ -37,12 +38,13 @@ function autoGrow(el) {
 function saveDraft() {
     const content = textarea?.value || '';
     const title = titleInput?.value || '';
-    if (!content && !title) {
+    const amount = amountInput?.value || '';
+    if (!content && !title && !amount) {
         clearDraft();
         return;
     }
     try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({ content, title, ts: Date.now() }));
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ content, title, amount, ts: Date.now() }));
         if (saveWarning) saveWarning.hidden = true;
     } catch (err) {
         console.warn('Draft auto-save failed:', err.message);
@@ -138,6 +140,41 @@ function buildOverlay() {
     titleGroup.appendChild(titleToggle);
     titleGroup.appendChild(titleInput);
 
+    // Amount toggle + input (goal tracking)
+    const amountGroup = document.createElement('div');
+    amountGroup.className = 'compose-sheet-amount-group';
+
+    const amountToggle = document.createElement('button');
+    amountToggle.className = 'compose-sheet-title-toggle';
+    amountToggle.type = 'button';
+    amountToggle.textContent = '+ Add amount';
+    amountToggle.setAttribute('aria-expanded', 'false');
+    amountToggle.setAttribute('aria-controls', 'compose-sheet-amount-input');
+    amountToggle.addEventListener('click', () => {
+        amountGroup.classList.toggle('expanded');
+        if (amountGroup.classList.contains('expanded')) {
+            amountToggle.textContent = '− Remove amount';
+            amountToggle.setAttribute('aria-expanded', 'true');
+            amountInput.focus();
+        } else {
+            amountToggle.textContent = '+ Add amount';
+            amountToggle.setAttribute('aria-expanded', 'false');
+            amountInput.value = '';
+        }
+    });
+
+    amountInput = document.createElement('input');
+    amountInput.type = 'number';
+    amountInput.id = 'compose-sheet-amount-input';
+    amountInput.className = 'compose-sheet-title-input';
+    amountInput.placeholder = 'Amount (¥, optional)';
+    amountInput.min = '0';
+    amountInput.step = '0.01';
+    amountInput.setAttribute('inputmode', 'decimal');
+
+    amountGroup.appendChild(amountToggle);
+    amountGroup.appendChild(amountInput);
+
     // Draft recovery notice
     draftNotice = document.createElement('div');
     draftNotice.className = 'compose-sheet-draft-notice';
@@ -154,6 +191,7 @@ function buildOverlay() {
         clearDraft();
         textarea.value = '';
         titleInput.value = '';
+        amountInput.value = '';
         const tg = overlay.querySelector('.compose-sheet-title-group');
         if (tg) {
             tg.classList.remove('expanded');
@@ -161,6 +199,15 @@ function buildOverlay() {
             if (t) {
                 t.textContent = '+ Add title';
                 t.setAttribute('aria-expanded', 'false');
+            }
+        }
+        const ag = overlay.querySelector('.compose-sheet-amount-group');
+        if (ag) {
+            ag.classList.remove('expanded');
+            const a = ag.querySelector('.compose-sheet-title-toggle');
+            if (a) {
+                a.textContent = '+ Add amount';
+                a.setAttribute('aria-expanded', 'false');
             }
         }
         draftNotice.hidden = true;
@@ -206,6 +253,7 @@ function buildOverlay() {
     });
 
     titleInput.addEventListener('input', scheduleSave);
+    amountInput.addEventListener('input', scheduleSave);
 
     const actions = document.createElement('div');
     actions.className = 'compose-sheet-actions';
@@ -229,6 +277,7 @@ function buildOverlay() {
     // Assemble
     sheet.appendChild(header);
     sheet.appendChild(titleGroup);
+    sheet.appendChild(amountGroup);
     sheet.appendChild(draftNotice);
     sheet.appendChild(saveWarning);
     sheet.appendChild(textarea);
@@ -255,7 +304,7 @@ function open() {
 
     // Recover draft
     const draft = loadDraft();
-    if (draft && (draft.content || draft.title)) {
+    if (draft && (draft.content || draft.title || draft.amount)) {
         textarea.value = draft.content || '';
         if (draft.title) {
             titleInput.value = draft.title;
@@ -265,6 +314,16 @@ function open() {
                 tg.classList.add('expanded');
                 toggle.textContent = '\u2212 Remove title';
                 toggle.setAttribute('aria-expanded', 'true');
+            }
+        }
+        if (draft.amount) {
+            amountInput.value = draft.amount;
+            const ag = overlay.querySelector('.compose-sheet-amount-group');
+            const atoggle = ag?.querySelector('.compose-sheet-title-toggle');
+            if (ag && atoggle) {
+                ag.classList.add('expanded');
+                atoggle.textContent = '\u2212 Remove amount';
+                atoggle.setAttribute('aria-expanded', 'true');
             }
         }
         draftNotice.hidden = false;
@@ -302,6 +361,7 @@ function close() {
     // Capture values before resetting the form
     const draftContent = textarea.value;
     const draftTitle = titleInput.value;
+    const draftAmount = amountInput.value;
 
     overlay.hidden = true;
     overlay.style.height = '';
@@ -321,6 +381,7 @@ function close() {
     draftNotice.hidden = true;
     textarea.value = '';
     titleInput.value = '';
+    amountInput.value = '';
     const titleGroup = overlay.querySelector('.compose-sheet-title-group');
     if (titleGroup) {
         titleGroup.classList.remove('expanded');
@@ -330,15 +391,24 @@ function close() {
             toggle.setAttribute('aria-expanded', 'false');
         }
     }
+    const amountGroup = overlay.querySelector('.compose-sheet-amount-group');
+    if (amountGroup) {
+        amountGroup.classList.remove('expanded');
+        const atoggle = amountGroup.querySelector('.compose-sheet-title-toggle');
+        if (atoggle) {
+            atoggle.textContent = '+ Add amount';
+            atoggle.setAttribute('aria-expanded', 'false');
+        }
+    }
 
     // Reset buttons
     resetButtons();
     isSubmitting = false;
 
     // Save captured draft after form reset
-    if (draftContent || draftTitle) {
+    if (draftContent || draftTitle || draftAmount) {
         try {
-            localStorage.setItem(DRAFT_KEY, JSON.stringify({ content: draftContent, title: draftTitle, ts: Date.now() }));
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({ content: draftContent, title: draftTitle, amount: draftAmount, ts: Date.now() }));
         } catch (err) {
             console.warn('Draft save on close failed:', err.message);
             showToast('Draft could not be saved \u2014 your work may be lost', 'error');
@@ -458,8 +528,15 @@ async function handleSubmit(isDraft) {
     const hasTitle = titleGroup?.classList.contains('expanded');
     const title = hasTitle ? titleInput.value.trim() : '';
 
+    // Amount is opt-in like the title: only sent when the field is expanded,
+    // so quick capture with no amount hits the API exactly as before.
+    const amountGroupEl = overlay.querySelector('.compose-sheet-amount-group');
+    const hasAmount = amountGroupEl?.classList.contains('expanded');
+    const amount = hasAmount ? amountInput.value.trim() : '';
+
     const body = { content, draft: isDraft };
     if (title) body.title = title;
+    if (amount) body.amount = amount;
 
     let result;
     try {
@@ -479,6 +556,7 @@ async function handleSubmit(isDraft) {
             await queuePost(body);
             textarea.value = '';
             titleInput.value = '';
+            amountInput.value = '';
             clearDraft();
             close();
             showToast('Saved offline \u2014 will publish when back online', 'info');
@@ -500,6 +578,7 @@ async function handleSubmit(isDraft) {
         // Clear fields BEFORE close() so close() won't re-save them
         textarea.value = '';
         titleInput.value = '';
+        amountInput.value = '';
         clearDraft();
         close();
         if (!isDraft) prependCard(result.data, content, title);

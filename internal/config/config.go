@@ -169,6 +169,10 @@ type BlogConfig struct {
 	Theme        string `json:"theme"`
 	Style        string `json:"style"`
 	PostsPerPage int    `json:"posts_per_page"`
+	// GoalTotal is the denominator of the home-page goal progress bar
+	// ("无敌之日"): sum of published posts' amount frontmatter over this
+	// total. 0 (BLOG_GOAL_TOTAL unset) disables the bar entirely.
+	GoalTotal float64 `json:"goal_total"`
 }
 
 // LoggingConfig holds logging-related configuration options.
@@ -355,6 +359,7 @@ func Load() (*Config, error) {
 			Theme:        getEnv("BLOG_THEME", "default"),
 			Style:        getEnv("BLOG_STYLE", "minimal"),
 			PostsPerPage: getEnvInt("BLOG_POSTS_PER_PAGE", 10),
+			GoalTotal:    getEnvFloat("BLOG_GOAL_TOTAL", 0),
 		},
 
 		About: AboutConfig{
@@ -441,6 +446,15 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
 		}
 	}
 	return defaultValue
